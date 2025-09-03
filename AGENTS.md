@@ -9,13 +9,15 @@
 - Tooling/config: `vite.config.ts`, `tsconfig.json`, `.eslintrc.cjs`, `cypress.config.ts`, `capacitor.config.ts`.
 
 ## Build, Test, and Development Commands
-Run all commands from `bold_explorer/`:
-- `npm run dev`: Start Vite dev server (Ionic Vue app).
-- `npm run build`: Type-check with `vue-tsc`, then build with Vite to `dist/`.
-- `npm run preview`: Serve the production build locally.
-- `npm run test:unit`: Run Vitest unit tests (jsdom env).
-- `npm run test:e2e`: Run Cypress end-to-end tests.
-- `npm run lint`: Lint with ESLint.
+Run from `bold_explorer/` and use pnpm:
+- Setup: `corepack enable` then `pnpm install`.
+- Dependencies: use pnpm only; always commit `pnpm-lock.yaml` for reproducible installs. Do not use npm, Yarn, or Bun without explicit user approval.
+- `pnpm dev`: Start Vite dev server (Ionic Vue app).
+- `pnpm build`: Type-check with `vue-tsc`, then build to `dist/`.
+- `pnpm preview`: Serve the production build locally.
+- `pnpm test:unit`: Run Vitest unit tests (jsdom env).
+- `pnpm test:e2e`: Run Cypress end-to-end tests.
+- `pnpm lint`: Lint with ESLint.
 
 ## Coding Style & Naming Conventions
 - Language: TypeScript + Vue 3 SFCs (`<script setup lang="ts">`).
@@ -25,17 +27,26 @@ Run all commands from `bold_explorer/`:
 - Lint rules: Vue 3 essential + TypeScript recommended; fix warnings before submitting.
 
 ## Testing Guidelines
-- Unit tests: place alongside repo tests in `tests/unit/`, name `*.spec.ts`.
+- Unit tests: place under `tests/unit/`, name `*.spec.ts`.
 - E2E tests: add Cypress specs under `tests/e2e/specs/`, name `*.cy.ts`.
-- Run locally: `npm run test:unit` and `npm run test:e2e`.
+- Run locally: `pnpm test:unit` and `pnpm test:e2e`.
 - Aim for meaningful assertions (rendered text, route changes, and component behavior). Keep tests fast and deterministic.
 
 ## Commit & Pull Request Guidelines
-- Commits: concise, imperative mood; group related changes. Prefer Conventional Commit style (e.g., `feat: add Tab3 content`).
-- PRs: include a clear description, screenshots for UI changes, and linked issues (e.g., `Closes #12`).
+- Commits: imperative subject + thorough body. Explain why, what changed, how it was implemented, and how it was verified. Use Conventional Commits (`feat:`, `fix:`, `chore:`) and group related changes.
+- Example message:
+  - Subject: `fix(router): correct default tab redirect`
+  - Body: rationale, key code paths, migration notes, and test evidence (e.g., commands run, screenshots).
+- PRs: include a detailed description, screenshots for UI changes, and linked issues (e.g., `Closes #12`).
 - Checks: ensure `build`, `lint`, and all tests pass locally before requesting review.
 
 ## Security & Configuration Tips
 - Do not commit secrets. Use local env files (`.env.local` is ignored) and Capacitor platform configs per environment.
 - Mobile builds: Capacitor outputs to `android/` or `ios/` (not tracked). After web build, run native sync as needed.
 
+## Agent-Specific Instructions
+- When collaborating live with the user, commit after each discrete bug fix, feature, or chore.
+- Treat a prompt starting with `BUG:`, `FEAT:`, or `CHORE:` as a strong hint to commit using the matching Conventional Commit type (`fix:`, `feat:`, `chore:`).
+- Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
+- Example:
+  - `git add -A && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`

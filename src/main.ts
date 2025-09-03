@@ -4,6 +4,7 @@ import router from './router';
 import { IonicVue } from '@ionic/vue';
 import { createPinia } from 'pinia';
 import { installRepositories } from './plugins/repositories';
+import { installActions } from './plugins/actions';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/vue/css/core.css';
@@ -43,6 +44,8 @@ async function bootstrap() {
     .use(IonicVue)
     .use(pinia)
     .use(router);
+
+  installActions(app);
 
   router.isReady().then(() => {
     app.mount('#app');

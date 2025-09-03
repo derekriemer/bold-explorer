@@ -1,5 +1,5 @@
-import { createApp } from 'vue'
-import App from './App.vue'
+import { createApp } from 'vue';
+import App from './App.vue';
 import router from './router';
 import { IonicVue } from '@ionic/vue';
 import { createPinia } from 'pinia';
@@ -36,12 +36,13 @@ import '@ionic/vue/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 async function bootstrap() {
+  const pinia = createPinia();
+  await installRepositories(pinia);
+
   const app = createApp(App)
     .use(IonicVue)
-    .use(createPinia())
+    .use(pinia)
     .use(router);
-
-  await installRepositories(app);
 
   router.isReady().then(() => {
     app.mount('#app');

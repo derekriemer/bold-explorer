@@ -1,4 +1,4 @@
-import type { Kysely, Sql } from 'kysely';
+import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
 

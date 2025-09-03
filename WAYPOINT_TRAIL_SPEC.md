@@ -41,9 +41,7 @@ src/
       gpx/gpx.service.ts     # GPX import/export via Filesystem
       prefs/preferences.service.ts
   plugins/
-    repositories.ts          # builds repos from initAppDb(), provides via Vue
-  composables/
-    useRepos.ts              # injects repositories (throws if missing)
+    repositories.ts          # builds repos from initAppDb(), installs Pinia plugin
   stores/
     useTrails.ts
     useWaypoints.ts
@@ -508,11 +506,9 @@ Do not implement Favorites yet. Intentionally excluded from this version.
 
 DI into Vue
 
-Plugin (plugins/repositories.ts****************************************):await initAppDb() → create repo instances → app.provide(TRAILS_REPO_KEY, ...), etc.
+Plugin (plugins/repositories.ts):await initAppDb() → create repo instances → pinia.use(() => ({ $repos: repos }))
 
-Composable (composables/useRepos.ts****************************************):useRepos() injects repositories; throws with a clear message if not provided
-
-Stores use repos via the composable; no SQL in stores/pages
+Stores access repos via this.$repos; no SQL in stores/pages
 
 Stores (shape)
 
@@ -598,7 +594,7 @@ GPS page shows heading, bearing, distance, follow‑trail mode with next‑waypo
 
 Stores
 
-Stores call repos via useRepos() only; no SQL in stores/pages.
+Stores access repos via this.; no SQL in stores/pages.
 
 useWaypoints.addToTrail() refreshes byTrail[trailId] after writes.
 

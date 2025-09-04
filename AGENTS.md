@@ -1,6 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
+
 - Root app: `bold_explorer/` (Ionic Vue + Vite).
 - Source: `bold_explorer/src/` with `components/`, `views/`, `router/`, `theme/`.
 - Routing: `bold_explorer/src/router/index.ts` with tab routes (`/tabs/tab1` etc.).
@@ -9,7 +10,9 @@
 - Tooling/config: `vite.config.ts`, `tsconfig.json`, `.eslintrc.cjs`, `cypress.config.ts`, `capacitor.config.ts`.
 
 ## Build, Test, and Development Commands
+
 Run from `bold_explorer/` and use pnpm:
+
 - Setup: `corepack enable` then `pnpm install`.
 - Dependencies: use pnpm only; always commit `pnpm-lock.yaml` for reproducible installs. Do not use npm, Yarn, or Bun without explicit user approval.
 - `pnpm dev`: Start Vite dev server (Ionic Vue app).
@@ -20,19 +23,23 @@ Run from `bold_explorer/` and use pnpm:
 - `pnpm lint`: Lint with ESLint.
 
 ## Coding Style & Naming Conventions
+
 - Language: TypeScript + Vue 3 SFCs (`<script setup lang="ts">`).
 - Indentation: 2 spaces; keep lines focused and readable.
 - Components/views: PascalCase file names (e.g., `TabsPage.vue`, `Tab1Page.vue`).
 - Imports: Use alias `@` for `src/` (e.g., `@/views/Tab1Page.vue`).
 - Lint rules: Vue 3 essential + TypeScript recommended; fix warnings before submitting.
+- Types: Avoid using any unless absolutely necessary, ask an expert user for typing help if you require it.
 
 ## Testing Guidelines
+
 - Unit tests: place under `tests/unit/`, name `*.spec.ts`.
 - E2E tests: add Cypress specs under `tests/e2e/specs/`, name `*.cy.ts`.
 - Run locally: `pnpm test:unit` and `pnpm test:e2e`.
 - Aim for meaningful assertions (rendered text, route changes, and component behavior). Keep tests fast and deterministic.
 
 ## Commit & Pull Request Guidelines
+
 - Commits: imperative subject + thorough body. Explain why, what changed, how it was implemented, and how it was verified. Use Conventional Commits (`feat:`, `fix:`, `chore:`) and group related changes.
 - Example message:
   - Subject: `fix(router): correct default tab redirect`
@@ -41,10 +48,12 @@ Run from `bold_explorer/` and use pnpm:
 - Checks: ensure `build`, `lint`, and all tests pass locally before requesting review.
 
 ## Security & Configuration Tips
+
 - Do not commit secrets. Use local env files (`.env.local` is ignored) and Capacitor platform configs per environment.
 - Mobile builds: Capacitor outputs to `android/` or `ios/` (not tracked). After web build, run native sync as needed.
 
 ## Agent-Specific Instructions
+
 - When collaborating live with the user, commit after each discrete bug fix, feature, or chore.
 - Treat a prompt starting with `BUG:`, `FEAT:`, or `CHORE:` as a strong hint to commit using the matching Conventional Commit type (`fix:`, `feat:`, `chore:`).
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.

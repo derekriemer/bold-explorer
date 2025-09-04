@@ -11,6 +11,14 @@ export default defineConfig({
     vue(),
     legacy()
   ],
+  build: {
+    rollupOptions: {
+      external: [
+        // Native-only; not bundled for web
+        'better-sqlite3'
+      ]
+    }
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

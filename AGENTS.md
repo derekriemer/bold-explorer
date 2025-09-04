@@ -47,6 +47,22 @@ Run from `bold_explorer/` and use pnpm:
 - PRs: include a detailed description, screenshots for UI changes, and linked issues (e.g., `Closes #12`).
 - Checks: ensure `build`, `lint`, and all tests pass locally before requesting review.
 
+### Commit message formatting (preferred)
+- Prefer a here‑doc over multiple `-m` flags for multi‑line commit messages. This keeps complex bodies readable and easy to review in the terminal history.
+
+Example:
+
+```
+git add -A && git commit -F - <<'MSG'
+feat(waypoints): MVP Waypoints page with search and actions
+
+Add search, sliding actions (attach/rename/delete), and toolbar buttons.
+Stub GPX import/export pending storage service wiring.
+
+Verification: built with pnpm, manual flows exercised.
+MSG
+```
+
 ## Security & Configuration Tips
 
 - Do not commit secrets. Use local env files (`.env.local` is ignored) and Capacitor platform configs per environment.
@@ -59,6 +75,15 @@ Run from `bold_explorer/` and use pnpm:
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
 - Example:
   - `git add -A && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`
+  - Or using the preferred here‑doc style for multi‑line bodies (recommended):
+    
+    ```
+    git add -A && git commit -F - <<'MSG'
+    chore(lint): align settings with Vue 3
+
+    Explain rule changes, affected files, and local test/lint results.
+    MSG
+    ```
 
 ### Testing TODOs
 - Use `testing_plan.md` as the canonical checklist for unit tests.

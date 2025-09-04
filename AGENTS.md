@@ -59,3 +59,9 @@ Run from `bold_explorer/` and use pnpm:
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
 - Example:
   - `git add -A && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`
+
+### Testing TODOs
+- Use `testing_plan.md` as the canonical checklist for unit tests.
+- Before finishing a task that adds logic, add/extend tests and check the corresponding boxes in `testing_plan.md`.
+- Keep the list current; if plans change, update items rather than leaving them unchecked without context.
+- Run `pnpm test:unit` locally and ensure green before checking boxes.

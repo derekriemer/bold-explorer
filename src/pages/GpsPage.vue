@@ -60,9 +60,31 @@
             <ion-label>Audio Cues</ion-label>
             <ion-toggle v-model="audioCues" @ionChange="saveAudioCues" aria-label="Toggle audio cues"></ion-toggle>
           </ion-item>
+          <ion-item lines="none">
+            <ion-label>Show Debug</ion-label>
+            <ion-toggle v-model="debugOpen" aria-label="Toggle diagnostics panel"></ion-toggle>
+          </ion-item>
+          <ion-button fill="outline" size="small" @click="runDiagnostics" aria-label="Run diagnostics">Run Diagnostics</ion-button>
         </div>
 
         <div class="sr-only" aria-live="polite">{{ announcement }}</div>
+
+        <ion-card v-if="debugOpen">
+          <ion-card-content>
+            <div class="debug-grid">
+              <div><span class="k">GPS:</span> <span class="v">{{ gps ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}` : 'none' }}</span></div>
+              <div><span class="k">Scope:</span> <span class="v">{{ scope }}</span></div>
+              <div><span class="k">TrailId:</span> <span class="v">{{ selectedTrailId ?? '-' }}</span></div>
+              <div><span class="k">Waypoints(all):</span> <span class="v">{{ waypointsAll.length }}</span></div>
+              <div v-if="selectedTrailId"><span class="k">Waypoints(trail):</span> <span class="v">{{ (wps.byTrail[selectedTrailId] ?? []).length }}</span></div>
+              <div><span class="k">Repos installed:</span> <span class="v">{{ diag?.repos ?? '—' }}</span></div>
+              <div><span class="k">Query OK:</span> <span class="v">{{ diag?.queryOk ?? '—' }}</span></div>
+              <div><span class="k">Create OK:</span> <span class="v">{{ diag?.createOk ?? '—' }}</span></div>
+              <div><span class="k">Delete OK:</span> <span class="v">{{ diag?.deleteOk ?? '—' }}</span></div>
+              <div v-if="diag?.error"><span class="k">Error:</span> <span class="v err">{{ diag?.error }}</span></div>
+            </div>
+          </ion-card-content>
+        </ion-card>
       </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
@@ -108,6 +130,8 @@ const { active, currentIndex, next, start: startFollow, stop: stopFollow, announ
 const units = ref<'metric' | 'imperial'>('metric');
 const audioCues = ref(false);
 const actions = useActions();
+const debugOpen = ref(false);
+const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
 
 const targetCoord = computed(() => {
   if (!gps.value) return null;
@@ -168,15 +192,55 @@ async function markWaypoint() {
     return;
   }
   const point = { name: `WP ${new Date().toLocaleTimeString()}`, lat: gps.value.lat, lon: gps.value.lon, elev_m: null };
-  if (scope.value === 'trail' && selectedTrailId.value) {
-    await wps.addToTrail(selectedTrailId.value, point);
-    await wps.loadForTrail(selectedTrailId.value);
-    actions.show('Waypoint added to trail', { kind: 'success' });
-  } else {
-    await wps.$repos.waypoints.create(point as any);
-    await wps.refreshAll();
-    actions.show('Waypoint created', { kind: 'success' });
+  try {
+    if (scope.value === 'trail' && selectedTrailId.value) {
+      await wps.addToTrail(selectedTrailId.value, point);
+      await wps.loadForTrail(selectedTrailId.value);
+      actions.show('Waypoint added to trail', { kind: 'success' });
+    } else {
+      await wps.$repos.waypoints.create(point as any);
+      await wps.refreshAll();
+      actions.show('Waypoint created', { kind: 'success' });
+    }
+  } catch (err: any) {
+    console.error('Mark waypoint failed', err);
+    actions.show(`Failed to save waypoint: ${err?.message ?? String(err)}` , { kind: 'error', placement: 'banner-top', durationMs: null });
   }
+}
+
+async function runDiagnostics() {
+  const out: any = {};
+  try {
+    out.repos = !!wps?.$repos?.waypoints && typeof wps.$repos.waypoints.all === 'function';
+    if (!out.repos) throw new Error('Pinia repos not installed');
+    const list = await wps.$repos.waypoints.all();
+    out.count = list.length;
+    out.queryOk = true;
+  } catch (e: any) {
+    out.error = `Query failed: ${e?.message ?? String(e)}`;
+    diag.value = out;
+    actions.show(out.error, { kind: 'error', placement: 'banner-top', durationMs: null });
+    return;
+  }
+  // Try create/delete a temp waypoint to test write path
+  let tempId: number | null = null;
+  try {
+    tempId = await wps.$repos.waypoints.create({ name: `diag-${Date.now()}`, lat: 0, lon: 0, elev_m: null } as any);
+    out.createOk = Number.isFinite(tempId);
+  } catch (e: any) {
+    out.error = `Create failed: ${e?.message ?? String(e)}`;
+    diag.value = out;
+    actions.show(out.error, { kind: 'error', placement: 'banner-top', durationMs: null });
+    return;
+  }
+  try {
+    if (tempId != null) await wps.$repos.waypoints.remove(tempId);
+    out.deleteOk = true;
+  } catch (e: any) {
+    out.error = `Delete failed: ${e?.message ?? String(e)}`;
+  }
+  diag.value = out;
+  actions.show('Diagnostics completed', { kind: out.error ? 'warning' : 'success' });
 }
 
 onMounted(async () => {
@@ -210,5 +274,8 @@ watch(selectedTrailId, async (id) => {
 .telemetry-item .label { color: var(--ion-color-medium); font-size: 0.85rem; }
 .telemetry-item .value { font-size: 1.5rem; font-weight: 600; }
 .controls { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; margin-top: 8px; }
+.debug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px; }
+.debug-grid .k { color: var(--ion-color-medium); margin-right: 6px; }
+.debug-grid .v.err { color: var(--ion-color-danger); }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
 </style>

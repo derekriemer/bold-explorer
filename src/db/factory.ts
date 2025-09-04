@@ -1,7 +1,6 @@
 import { Kysely, SqliteDialect } from 'kysely';
-import { CapacitorSQLiteDialect } from 'capacitor-sqlite-kysely';
+import CapacitorSQLiteKyselyDialect from 'capacitor-sqlite-kysely';
 import { SQLiteConnection, CapacitorSQLite } from '@capacitor-community/sqlite';
-import SQLite from 'better-sqlite3';
 import type { DB } from './schema';
 import { createMigrator } from './migrations/provider';
 
@@ -12,13 +11,14 @@ async function migrate(db: Kysely<DB>) {
 
 export async function createAppDb() {
   const sqlite = new SQLiteConnection(CapacitorSQLite);
-  const dialect = new CapacitorSQLiteDialect({ sqlite, database: 'app.db' });
+  const dialect = new CapacitorSQLiteKyselyDialect(sqlite, { name: 'app' });
   const db = new Kysely<DB>({ dialect });
   await migrate(db);
   return db;
 }
 
 export async function createTestDb() {
+  const SQLite = (await import('better-sqlite3')).default as any;
   const dialect = new SqliteDialect({ database: new SQLite(':memory:') });
   const db = new Kysely<DB>({ dialect });
   await migrate(db);

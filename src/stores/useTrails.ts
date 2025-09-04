@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia';
+import type { Selectable } from 'kysely';
 import type { Trail } from '@/db/schema';
 
 export const useTrails = defineStore('trails', {
-  state: () => ({ list: [] as Trail[] }),
+  state: () => ({ list: [] as Selectable<Trail>[] }),
   actions: {
     async refresh() {
       this.list = await this.$repos.trails.all();

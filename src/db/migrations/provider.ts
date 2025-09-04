@@ -6,10 +6,10 @@ export const migrations = {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable('trail')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('name', 'text', (col) => col.notNull())
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('name', 'text', (col: any) => col.notNull())
         .addColumn('description', 'text')
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
     },
     async down(db: Kysely<any>) {
@@ -20,13 +20,13 @@ export const migrations = {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable('waypoint')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('name', 'text', (col) => col.notNull())
-        .addColumn('lat', 'real', (col) => col.notNull())
-        .addColumn('lon', 'real', (col) => col.notNull())
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('name', 'text', (col: any) => col.notNull())
+        .addColumn('lat', 'real', (col: any) => col.notNull())
+        .addColumn('lon', 'real', (col: any) => col.notNull())
         .addColumn('elev_m', 'real')
         .addColumn('description', 'text')
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
       await db.schema
         .createIndex('idx_waypoint_lat_lon')
@@ -43,11 +43,11 @@ export const migrations = {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable('trail_waypoint')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('trail_id', 'integer', (col) => col.notNull().references('trail.id'))
-        .addColumn('waypoint_id', 'integer', (col) => col.notNull().references('waypoint.id'))
-        .addColumn('position', 'integer', (col) => col.notNull())
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('trail_id', 'integer', (col: any) => col.notNull().references('trail.id'))
+        .addColumn('waypoint_id', 'integer', (col: any) => col.notNull().references('waypoint.id'))
+        .addColumn('position', 'integer', (col: any) => col.notNull())
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
       await db.schema.createIndex('idx_trail_waypoint_trail').on('trail_waypoint').column('trail_id').execute();
       await db.schema.createIndex('idx_trail_waypoint_wp').on('trail_waypoint').column('waypoint_id').execute();
@@ -63,28 +63,28 @@ export const migrations = {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable('collection')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('name', 'text', (col) => col.notNull())
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('name', 'text', (col: any) => col.notNull())
         .addColumn('description', 'text')
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
 
       await db.schema
         .createTable('collection_waypoint')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('collection_id', 'integer', (col) => col.notNull().references('collection.id'))
-        .addColumn('waypoint_id', 'integer', (col) => col.notNull().references('waypoint.id'))
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('collection_id', 'integer', (col: any) => col.notNull().references('collection.id'))
+        .addColumn('waypoint_id', 'integer', (col: any) => col.notNull().references('waypoint.id'))
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
       await db.schema.createIndex('idx_collection_waypoint_collection').on('collection_waypoint').column('collection_id').execute();
       await db.schema.createIndex('idx_collection_waypoint_wp').on('collection_waypoint').column('waypoint_id').execute();
 
       await db.schema
         .createTable('collection_trail')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('collection_id', 'integer', (col) => col.notNull().references('collection.id'))
-        .addColumn('trail_id', 'integer', (col) => col.notNull().references('trail.id'))
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('collection_id', 'integer', (col: any) => col.notNull().references('collection.id'))
+        .addColumn('trail_id', 'integer', (col: any) => col.notNull().references('trail.id'))
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
       await db.schema.createIndex('idx_collection_trail_collection').on('collection_trail').column('collection_id').execute();
       await db.schema.createIndex('idx_collection_trail_trail').on('collection_trail').column('trail_id').execute();
@@ -99,14 +99,14 @@ export const migrations = {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable('auto_waypoint')
-        .addColumn('id', 'integer', (col) => col.primaryKey().autoIncrement())
-        .addColumn('trail_id', 'integer', (col) => col.notNull().references('trail.id'))
+        .addColumn('id', 'integer', (col: any) => col.primaryKey().autoIncrement())
+        .addColumn('trail_id', 'integer', (col: any) => col.notNull().references('trail.id'))
         .addColumn('name', 'text')
-        .addColumn('segment_index', 'integer', (col) => col.notNull())
-        .addColumn('offset_m', 'real', (col) => col.notNull())
+        .addColumn('segment_index', 'integer', (col: any) => col.notNull())
+        .addColumn('offset_m', 'real', (col: any) => col.notNull())
         .addColumn('lat', 'real')
         .addColumn('lon', 'real')
-        .addColumn('created_at', 'text', (col) => col.notNull())
+        .addColumn('created_at', 'text', (col: any) => col.notNull())
         .execute();
       await db.schema.createIndex('idx_auto_waypoint_trail').on('auto_waypoint').column('trail_id').execute();
       await db.schema.createIndex('idx_auto_waypoint_trail_segment').on('auto_waypoint').columns(['trail_id','segment_index']).execute();

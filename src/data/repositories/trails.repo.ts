@@ -1,10 +1,10 @@
-import type { Kysely } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import type { DB, Trail } from '@/db/schema';
 
 export class TrailsRepo {
   constructor(private db: Kysely<DB>) {}
 
-  all(): Promise<Trail[]> {
+  all(): Promise<Selectable<Trail>[]> {
     return this.db.selectFrom('trail').selectAll().execute();
   }
 
@@ -26,7 +26,7 @@ export class TrailsRepo {
   }
 
   async remove(id: number): Promise<void> {
-    await this.db.transaction().execute(async (trx) => {
+    await this.db.transaction().execute(async (trx: Kysely<DB>) => {
       await trx.deleteFrom('trail_waypoint').where('trail_id', '=', id).execute();
       await trx.deleteFrom('collection_trail').where('trail_id', '=', id).execute();
       await trx.deleteFrom('auto_waypoint').where('trail_id', '=', id).execute();

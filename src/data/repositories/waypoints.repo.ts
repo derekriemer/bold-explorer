@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
 
@@ -8,7 +8,7 @@ const EARTH_R = 6371000;
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}
 
-  all(): Promise<Waypoint[]> {
+  all(): Promise<Selectable<Waypoint>[]> {
     return this.db.selectFrom('waypoint').selectAll().execute();
   }
 
@@ -28,7 +28,7 @@ export class WaypointsRepo {
   }
 
   async addToTrail(input: { trailId: number; name: string; lat: number; lon: number; elev_m?: number | null; position?: number }): Promise<{ waypointId: number; position: number }> {
-    return this.db.transaction().execute(async (trx) => {
+    return this.db.transaction().execute(async (trx: Kysely<DB>) => {
       const waypointId = await new WaypointsRepo(trx as any).create(input);
       const position = await this.attachToTrail(trx as any, input.trailId, waypointId, input.position);
       return { waypointId, position };
@@ -63,18 +63,18 @@ export class WaypointsRepo {
     return this.attachToTrail(this.db, trailId, waypointId, position);
   }
 
-  forTrail(trailId: number): Promise<Waypoint[]> {
+  forTrail(trailId: number): Promise<Selectable<Waypoint>[]> {
     return this.db
       .selectFrom('trail_waypoint as tw')
       .innerJoin('waypoint as w', 'w.id', 'tw.waypoint_id')
-      .select(['w.id', 'w.name', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
+      .select(['w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
       .where('tw.trail_id', '=', trailId)
       .orderBy('tw.position')
       .execute();
   }
 
   async setPosition(trailId: number, waypointId: number, position: number): Promise<void> {
-    await this.db.transaction().execute(async (trx) => {
+    await this.db.transaction().execute(async (trx: Kysely<DB>) => {
       const current = await trx
         .selectFrom('trail_waypoint')
         .select('position')
@@ -111,7 +111,7 @@ export class WaypointsRepo {
   }
 
   async detach(trailId: number, waypointId: number): Promise<void> {
-    await this.db.transaction().execute(async (trx) => {
+    await this.db.transaction().execute(async (trx: Kysely<DB>) => {
       const row = await trx
         .selectFrom('trail_waypoint')
         .select('position')
@@ -146,12 +146,12 @@ export class WaypointsRepo {
     });
   }
 
-  async forLocation(center: { lat: number; lon: number }, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Waypoint & { distance_m?: number }>> {
+  async forLocation(center: { lat: number; lon: number }, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Selectable<Waypoint> & { distance_m?: number }>> {
     const degLat = radiusM / 111320;
     const degLon = radiusM / (111320 * Math.cos(center.lat * RAD));
     const base = this.db
       .selectFrom('waypoint as w')
-      .$if(!!opts?.trailId, (qb) =>
+      .$if(!!opts?.trailId, (qb: any) =>
         qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
       )
       .where('w.lat', '>=', center.lat - degLat)
@@ -171,14 +171,14 @@ export class WaypointsRepo {
 
     const rows = await base
       .select([
-        'w.id', 'w.name', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
+        'w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
         ...(opts?.includeDistance ? [distanceExpr] : [])
       ])
-      .$if(!!opts?.includeDistance, (qb) => qb.orderBy('distance_m'))
-      .$if(!opts?.includeDistance, (qb) => qb.orderBy('w.id'))
+      .$if(!!opts?.includeDistance, (qb: any) => qb.orderBy('distance_m'))
+      .$if(!opts?.includeDistance, (qb: any) => qb.orderBy('w.id'))
       .execute();
 
-    const nearby = opts?.includeDistance ? rows.filter(r => (r as any).distance_m <= radiusM) : rows;
+    const nearby = opts?.includeDistance ? rows.filter((r: any) => (r as any).distance_m <= radiusM) : rows;
     return opts?.limit ? nearby.slice(0, opts.limit) : nearby;
   }
 }

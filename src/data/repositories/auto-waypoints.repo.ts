@@ -1,10 +1,10 @@
-import type { Kysely } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import type { DB, AutoWaypoint } from '@/db/schema';
 
 export class AutoWaypointsRepo {
   constructor(private db: Kysely<DB>) {}
 
-  forTrail(trailId: number): Promise<AutoWaypoint[]> {
+  forTrail(trailId: number): Promise<Selectable<AutoWaypoint>[]> {
     return this.db.selectFrom('auto_waypoint').selectAll().where('trail_id', '=', trailId).execute();
   }
 

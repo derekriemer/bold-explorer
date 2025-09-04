@@ -1,10 +1,10 @@
-import type { Kysely } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import type { DB, Collection, Waypoint, Trail } from '@/db/schema';
 
 export class CollectionsRepo {
   constructor(private db: Kysely<DB>) {}
 
-  all(): Promise<Collection[]> {
+  all(): Promise<Selectable<Collection>[]> {
     return this.db.selectFrom('collection').selectAll().execute();
   }
 
@@ -51,11 +51,11 @@ export class CollectionsRepo {
       .execute().then(() => {});
   }
 
-  async contents(collectionId: number): Promise<{ waypoints: Waypoint[]; trails: Trail[] }> {
+  async contents(collectionId: number): Promise<{ waypoints: Selectable<Waypoint>[]; trails: Selectable<Trail>[] }> {
     const waypoints = await this.db
       .selectFrom('collection_waypoint as cw')
       .innerJoin('waypoint as w', 'w.id', 'cw.waypoint_id')
-      .select(['w.id', 'w.name', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
+      .select(['w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
       .where('cw.collection_id', '=', collectionId)
       .orderBy('cw.id')
       .execute();

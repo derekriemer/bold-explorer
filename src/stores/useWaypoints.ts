@@ -1,9 +1,16 @@
 import { defineStore } from 'pinia';
+import type { Selectable } from 'kysely';
 import type { Waypoint } from '@/db/schema';
 
 export const useWaypoints = defineStore('waypoints', {
-  state: () => ({ byTrail: {} as Record<number, Waypoint[]> }),
+  state: () => ({
+    byTrail: {} as Record<number, Selectable<Waypoint>[]>,
+    all: [] as Selectable<Waypoint>[]
+  }),
   actions: {
+    async refreshAll() {
+      this.all = await this.$repos.waypoints.all();
+    },
     async loadForTrail(trailId: number) {
       this.byTrail[trailId] = await this.$repos.waypoints.forTrail(trailId);
     },

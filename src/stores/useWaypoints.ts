@@ -11,6 +11,11 @@ export const useWaypoints = defineStore('waypoints', {
     async refreshAll() {
       this.all = await this.$repos.waypoints.all();
     },
+    async create(input: { name: string; lat: number; lon: number; elev_m?: number | null }) {
+      const id = await this.$repos.waypoints.create(input);
+      await this.refreshAll();
+      return id;
+    },
     async loadForTrail(trailId: number) {
       this.byTrail[trailId] = await this.$repos.waypoints.forTrail(trailId);
     },
@@ -18,6 +23,10 @@ export const useWaypoints = defineStore('waypoints', {
       const { waypointId } = await this.$repos.waypoints.addToTrail({ trailId, ...input });
       await this.loadForTrail(trailId);
       return waypointId;
+    },
+    async attach(trailId: number, waypointId: number, position?: number) {
+      await this.$repos.waypoints.attach(trailId, waypointId, position);
+      await this.loadForTrail(trailId);
     },
     async detach(trailId: number, waypointId: number) {
       await this.$repos.waypoints.detach(trailId, waypointId);

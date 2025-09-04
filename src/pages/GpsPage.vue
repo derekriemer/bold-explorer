@@ -161,14 +161,21 @@ async function saveAudioCues() {
 }
 
 async function markWaypoint() {
-  if (!gps.value) return;
+  if (!gps.value) {
+    actions.show('No GPS fix yet. Tap Recenter and allow location access.', {
+      kind: 'warning', placement: 'banner-top', durationMs: 2500
+    });
+    return;
+  }
   const point = { name: `WP ${new Date().toLocaleTimeString()}`, lat: gps.value.lat, lon: gps.value.lon, elev_m: null };
   if (scope.value === 'trail' && selectedTrailId.value) {
     await wps.addToTrail(selectedTrailId.value, point);
     await wps.loadForTrail(selectedTrailId.value);
+    actions.show('Waypoint added to trail', { kind: 'success' });
   } else {
     await wps.$repos.waypoints.create(point as any);
     await wps.refreshAll();
+    actions.show('Waypoint created', { kind: 'success' });
   }
 }
 

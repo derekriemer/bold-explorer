@@ -29,13 +29,13 @@ export interface ActionItem extends Required<Pick<ActionOptions, 'kind' | 'place
 export class ActionService {
   private seq = 1;
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
-  private state = reactive({
-    actions: [] as ActionItem[],
-    undoStack: [] as ActionItem[]
+  private state = reactive<{ actions: ActionItem[]; undoStack: ActionItem[] }>({
+    actions: [],
+    undoStack: []
   });
 
-  get actions() { return readonly(this.state.actions); }
-  get undoStack() { return readonly(this.state.undoStack); }
+  get actions(): readonly ActionItem[] { return readonly(this.state.actions) as readonly ActionItem[]; }
+  get undoStack(): readonly ActionItem[] { return readonly(this.state.undoStack) as readonly ActionItem[]; }
 
   show(message: string, opts: ActionOptions = {}): number {
     const id = this.seq++;

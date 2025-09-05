@@ -28,6 +28,7 @@ export interface ActionItem extends Required<Pick<ActionOptions, 'kind' | 'place
 
 export class ActionService {
   private seq = 1;
+  private timers = new Map<number, ReturnType<typeof setTimeout>>();
   private state = reactive({
     actions: [] as ActionItem[],
     undoStack: [] as ActionItem[]
@@ -53,10 +54,21 @@ export class ActionService {
     };
     this.state.actions.push(item);
     if (item.canUndo) this.state.undoStack.push(item);
+    if (item.durationMs !== null && item.durationMs !== undefined) {
+      const t = setTimeout(() => {
+        this.dismiss(id);
+      }, Math.max(0, item.durationMs));
+      this.timers.set(id, t);
+    }
     return id;
   }
 
   dismiss(id: number) {
+    const t = this.timers.get(id);
+    if (t) {
+      clearTimeout(t);
+      this.timers.delete(id);
+    }
     const idx = this.state.actions.findIndex(a => a.id === id);
     if (idx !== -1) {
       const [item] = this.state.actions.splice(idx, 1);
@@ -82,10 +94,12 @@ export class ActionService {
   }
 
   clearAll() {
+    // clear any pending timers
+    for (const t of this.timers.values()) clearTimeout(t);
+    this.timers.clear();
     this.state.actions.splice(0);
     this.state.undoStack.splice(0);
   }
 }
 
 export const actionsService = new ActionService();
-

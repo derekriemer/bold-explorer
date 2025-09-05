@@ -78,5 +78,20 @@ describe('ActionService', () => {
     expect((svc.actions as unknown as any[]).length).toBe(0);
     expect((svc.undoStack as unknown as any[]).length).toBe(0);
   });
-});
 
+  it('auto-dismisses timed action after n ms (fake timers)', () => {
+    vi.useFakeTimers();
+    const svc = new ActionService();
+    const onDismiss = vi.fn();
+    const id = svc.show('Timed', { durationMs: 3000, onDismiss });
+    expect((svc.actions as unknown as any[]).some(a => a.id === id)).toBe(true);
+
+    vi.advanceTimersByTime(2999);
+    expect((svc.actions as unknown as any[]).some(a => a.id === id)).toBe(true);
+
+    vi.advanceTimersByTime(1);
+    expect((svc.actions as unknown as any[]).some(a => a.id === id)).toBe(false);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+});

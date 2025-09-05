@@ -23,9 +23,12 @@
   </head>
 
   <body>
+    <!-- Web SQLite support via jeep-sqlite (for @capacitor-community/sqlite on web) -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/jeep-sqlite/dist/jeep-sqlite/jeep-sqlite.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/jeep-sqlite/dist/jeep-sqlite.js"></script>
+    <jeep-sqlite></jeep-sqlite>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 
 </html>
-

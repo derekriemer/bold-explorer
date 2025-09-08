@@ -23,6 +23,10 @@ export async function createAppDb() {
       }
     }
     try {
+      // Serve sql-wasm.wasm from our app public assets at /sqljs
+      await (CapacitorSQLite as any).setWasmPath?.('/sqljs');
+    } catch {}
+    try {
       await CapacitorSQLite.initWebStore();
     } catch (e) {
       // Proceed; the dialect may still work once the component is ready.

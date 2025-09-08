@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import { defineCustomElements as jeepSqlite } from 'jeep-sqlite/loader';
 import App from './App.vue';
 import router from './router';
 import { IonicVue } from '@ionic/vue';
@@ -37,6 +38,10 @@ import '@ionic/vue/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 async function bootstrap() {
+  // Register the jeep-sqlite custom element (web sqlite bridge)
+  if (typeof window !== 'undefined') {
+    jeepSqlite(window);
+  }
   const pinia = createPinia();
   await installRepositories(pinia);
 

@@ -59,6 +59,9 @@ importers:
       ionicons:
         specifier: ^7.0.0
         version: 7.4.0
+      jeep-sqlite:
+        specifier: ^2.8.0
+        version: 2.8.0
       kysely:
         specifier: ^0.28.5
         version: 0.28.5

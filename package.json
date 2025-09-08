@@ -28,6 +28,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "capacitor-sqlite-kysely": "^1.0.2",
     "ionicons": "^7.0.0",
+    "jeep-sqlite": "^2.8.0",
     "kysely": "^0.28.5",
     "pinia": "^2.1.7",
     "vue": "^3.3.0",

@@ -47,12 +47,9 @@ async function bootstrap() {
       el = document.createElement('jeep-sqlite');
       document.body.appendChild(el);
     }
-    // Ensure sql.js assets are loaded from /sqljs. Set both attribute and property.
-    el.setAttribute('wasm-path', '/sqljs');
-    (el as any).wasmPath = '/sqljs';
-    // Explicit log to help debug path issues rather than hiding errors
+    // Use default wasm path (/assets). Keep element visible for debugging.
     // eslint-disable-next-line no-console
-    console.info('[jeep-sqlite] wasmPath set to', el.getAttribute('wasm-path'));
+    console.info('[jeep-sqlite] using default wasm path (/assets)');
   }
   const pinia = createPinia();
   await installRepositories(pinia);

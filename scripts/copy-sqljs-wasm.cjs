@@ -46,7 +46,8 @@ function copyFile(src, dst) {
       console.error(`[copy-sqljs-wasm] Source not found: ${src}`);
       process.exit(1);
     }
-    const dst = path.join(__dirname, '..', 'public', 'sqljs', name);
+    // Per @capacitor-community/sqlite docs for Vue/React, place under public/assets
+    const dst = path.join(__dirname, '..', 'public', 'assets', name);
     copyFile(src, dst);
   }
 })();

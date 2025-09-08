@@ -23,8 +23,8 @@
   </head>
 
   <body>
-    <!-- Pre-create the web component with desired wasm path so it is present before plugin init -->
-    <jeep-sqlite wasm-path="/sqljs"></jeep-sqlite>
+    <!-- Pre-create the web component; default wasm path is /assets per docs -->
+    <jeep-sqlite></jeep-sqlite>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -41,6 +41,18 @@ async function bootstrap() {
   // Register the jeep-sqlite custom element (web sqlite bridge)
   if (typeof window !== 'undefined') {
     jeepSqlite(window);
+    await customElements.whenDefined('jeep-sqlite');
+    let el = document.querySelector('jeep-sqlite') as any;
+    if (!el) {
+      el = document.createElement('jeep-sqlite');
+      document.body.appendChild(el);
+    }
+    // Ensure sql.js assets are loaded from /sqljs. Set both attribute and property.
+    el.setAttribute('wasm-path', '/sqljs');
+    (el as any).wasmPath = '/sqljs';
+    // Explicit log to help debug path issues rather than hiding errors
+    // eslint-disable-next-line no-console
+    console.info('[jeep-sqlite] wasmPath set to', el.getAttribute('wasm-path'));
   }
   const pinia = createPinia();
   await installRepositories(pinia);

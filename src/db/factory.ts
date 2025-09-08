@@ -11,21 +11,9 @@ async function migrate(db: Kysely<DB>) {
 }
 
 export async function createAppDb() {
-  // On web, ensure the jeep-sqlite web component is registered and the store is initialized
+  // On web, ensure the web store is initialized. The <jeep-sqlite>
+  // element is created and configured in main.ts with wasmPath '/sqljs'.
   if (Capacitor.getPlatform() === 'web') {
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      if (!customElements.get('jeep-sqlite')) {
-        // If the app loads the component via index.html CDN script, this will already be defined.
-        // Otherwise, append the element so the plugin can bind to it.
-        const el = document.createElement('jeep-sqlite');
-        document.body.appendChild(el);
-        await (customElements as any).whenDefined?.('jeep-sqlite');
-      }
-    }
-    try {
-      // Serve sql-wasm.wasm from our app public assets at /sqljs
-      await (CapacitorSQLite as any).setWasmPath?.('/sqljs');
-    } catch {}
     try {
       await CapacitorSQLite.initWebStore();
     } catch (e) {

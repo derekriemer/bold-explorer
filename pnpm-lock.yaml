@@ -6,6 +6,7 @@ settings:
 
 overrides:
   rollup: 4.44.0
+  sql.js: 1.11.0
 
 importers:
 
@@ -3016,8 +3017,8 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
-  sql.js@1.13.0:
-    resolution: {integrity: sha512-RJbVP1HRDlUUXahJ7VMTcu9Rm1Nzw+EBpoPr94vnbD4LwR715F3CcxE2G2k45PewcaZ57pjetYa+LoSJLAASgA==}
+  sql.js@1.11.0:
+    resolution: {integrity: sha512-GsLUDU3vhOo14Pd5ME0y2te49JQyby6HuoCuadevEV+CGgTUjmYRrm7B7lhRyzOgrmcWmspUfyjNb6sOAEqdsA==}
 
   sshpk@1.18.0:
     resolution: {integrity: sha512-2p2KJZTSqQ/I3+HX42EpYOa2l3f8Erv8MWKsy2I9uf4wA7yFIkXRffYdsx86y6z4vHtV8u7g+pPlr8/4ouAxsQ==}
@@ -5908,7 +5909,7 @@ snapshots:
       browser-fs-access: 0.35.0
       jszip: 3.10.1
       localforage: 1.10.0
-      sql.js: 1.13.0
+      sql.js: 1.11.0
 
   js-beautify@1.15.4:
     dependencies:
@@ -6589,7 +6590,7 @@ snapshots:
 
   split2@4.2.0: {}
 
-  sql.js@1.13.0: {}
+  sql.js@1.11.0: {}
 
   sshpk@1.18.0:
     dependencies:

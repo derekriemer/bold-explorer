@@ -57,7 +57,8 @@
   },
   "pnpm": {
     "overrides": {
-      "rollup": "4.44.0"
+      "rollup": "4.44.0",
+      "sql.js": "1.11.0"
     }
   },
   "description": "An Ionic project"

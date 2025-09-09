@@ -32,6 +32,14 @@
                 <span v-if="'distance_m' in wp"> · {{ formatDistance((wp as any).distance_m, units) }}</span>
               </p>
             </ion-label>
+            <ion-buttons slot="end">
+              <ion-button size="small" fill="clear" color="medium" @click.stop="onRename(wp.id as number, wp.name)" aria-label="Edit waypoint">
+                Edit
+              </ion-button>
+              <ion-button size="small" fill="clear" color="danger" @click.stop="onDelete(wp.id as number)" aria-label="Delete waypoint">
+                Delete
+              </ion-button>
+            </ion-buttons>
           </ion-item>
           <ion-item-options side="end">
             <ion-item-option color="medium" @click="onAttach(wp.id as number)" aria-label="Attach to trail">Attach</ion-item-option>
@@ -97,15 +105,19 @@ import {
 } from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
 import { useGeolocation } from '@/composables/useGeolocation';
 import { formatDistance as fmtDistance } from '@/composables/useDistance';
 import { getUnits } from '@/data/storage/prefs/preferences.service';
+import { parseCenterParam } from '@/utils/locationParam';
+import { Geolocation } from '@capacitor/geolocation';
 
 const wps = useWaypoints();
 const trails = useTrails();
 const { current: gps, start, stop, recenter, ensurePermissions } = useGeolocation();
+const route = useRoute();
 
 const query = ref('');
 type WpWithDistance = ReturnType<typeof useWaypoints> extends infer T ? T extends { withDistanceFrom: any } ? (Awaited<ReturnType<T['withDistanceFrom']>>[number]) : never : never;
@@ -224,6 +236,28 @@ function onExport() { showTodo('Export — will implement later'); }
 onMounted(async () => {
   await Promise.all([wps.refreshAll(), trails.refresh()]);
   units.value = await getUnits();
+  // 1) Prefer explicit center passed from previous page via query param: ?center=lat,lon
+  const center = parseCenterParam(route.query.center as any) ?? (
+    route.query.lat != null && route.query.lon != null
+      ? { lat: Number(route.query.lat), lon: Number(route.query.lon) }
+      : null
+  );
+  if (center && Number.isFinite(center.lat) && Number.isFinite(center.lon)) {
+    nearby.value = await wps.withDistanceFrom(center);
+    return;
+  }
+
+  // 2) Otherwise, if location permission is already granted, recenter once and sort by distance.
+  try {
+    const status = await Geolocation.checkPermissions();
+    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted';
+    if (granted) {
+      await recenter({ enableHighAccuracy: true });
+      await refreshByDistance();
+    }
+  } catch {
+    // Ignore; no auto prompt on first view.
+  }
 });
 </script>
 <style scoped>

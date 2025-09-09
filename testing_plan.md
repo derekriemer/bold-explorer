@@ -16,6 +16,10 @@ Guidance for contributors/agents:
   - [x] haversineDistanceMeters: symmetry A→B = B→A
   - [x] initialBearingDeg: cardinal/quadrant cases, wrap to [0,360)
   - [x] deltaHeadingDeg: wrap-around and sign correctness (e.g., 350→10 = -20; 10→350 = 20)
+- [x] `tests/unit/utils/locationParam.spec.ts`
+  - [x] parseCenterParam: valid "lat,lon" parsing
+  - [x] parseCenterParam: array input picks first
+  - [x] parseCenterParam: rejects invalid formats and ranges
 - [x] `tests/unit/services/actions.service.spec.ts`
   - [x] show: defaults, durable vs timed (durationMs null)
   - [x] dismiss: removes and calls onDismiss

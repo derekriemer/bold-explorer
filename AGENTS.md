@@ -47,7 +47,13 @@ Run from `bold_explorer/` and use pnpm:
 - PRs: include a detailed description, screenshots for UI changes, and linked issues (e.g., `Closes #12`).
 - Checks: ensure `build`, `lint`, and all tests pass locally before requesting review.
 
+### guidelines for when to run a commit.
+
+- Let the user review the changes you did before committing, ask if the user wants to commit these changes instead of just going out and committing.
+- Do _not_ `git addd --all` or `git add -a`, instead, prefer figuring out which files changed and adding the files that are specific to a feature. This is much safer than adding potentially unrelated changes.
+
 ### Commit message formatting (preferred)
+
 - Prefer a here‑doc over multiple `-m` flags for multi‑line commit messages. This keeps complex bodies readable and easy to review in the terminal history.
 
 Example:
@@ -74,9 +80,10 @@ MSG
 - Treat a prompt starting with `BUG:`, `FEAT:`, or `CHORE:` as a strong hint to commit using the matching Conventional Commit type (`fix:`, `feat:`, `chore:`).
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
 - Example:
+
   - `git add -A && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`
   - Or using the preferred here‑doc style for multi‑line bodies (recommended):
-    
+
     ```
     git add -A && git commit -F - <<'MSG'
     chore(lint): align settings with Vue 3
@@ -86,6 +93,7 @@ MSG
     ```
 
 ### Testing TODOs
+
 - Use `testing_plan.md` as the canonical checklist for unit tests.
 - Before finishing a task that adds logic, add/extend tests and check the corresponding boxes in `testing_plan.md`.
 - Keep the list current; if plans change, update items rather than leaving them unchecked without context.

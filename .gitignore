@@ -32,5 +32,6 @@ npm-debug.log*
 /android
 /ios
 /www
+/public
 a.md
 .env

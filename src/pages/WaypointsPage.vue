@@ -114,11 +114,14 @@ import { formatDistance as fmtDistance } from '@/composables/useDistance';
 import { getUnits } from '@/data/storage/prefs/preferences.service';
 import { parseCenterParam } from '@/utils/locationParam';
 import { Geolocation } from '@capacitor/geolocation';
+import { useActions } from '@/composables/useActions';
+import type { Waypoint } from '@/db/schema';
 
 const wps = useWaypoints();
 const trails = useTrails();
 const { current: gps, start, stop, recenter, ensurePermissions } = useGeolocation();
 const route = useRoute();
+const actions = useActions();
 
 const query = ref('');
 type WpWithDistance = ReturnType<typeof useWaypoints> extends infer T ? T extends { withDistanceFrom: any } ? (Awaited<ReturnType<T['withDistanceFrom']>>[number]) : never : never;
@@ -188,30 +191,53 @@ async function doAdd(data: any) {
 const renameOpen = ref(false);
 const renameId = ref<number | null>(null);
 const renameDraft = ref('');
+const renamePrevName = ref<string>('');
 function onRename(id: number, currentName: string) {
   renameId.value = id;
   renameDraft.value = currentName;
+  renamePrevName.value = currentName;
   renameOpen.value = true;
 }
 async function doRename(name: string) {
   if (!renameId.value) return;
   const v = String(name ?? '').trim();
   if (!v) return;
-  await wps.rename(renameId.value, v);
+  const id = renameId.value;
+  const oldName = renamePrevName.value;
+  await wps.rename(id, v);
   await wps.refreshAll();
+  actions.show(`Renamed "${oldName}" → "${v}"`, {
+    kind: 'success',
+    canUndo: true,
+    onUndo: async () => {
+      await wps.rename(id, oldName);
+      await wps.refreshAll();
+    }
+  });
 }
 
 // Delete
 const deleteOpen = ref(false);
 const deleteId = ref<number | null>(null);
+const deleteSnapshot = ref<Waypoint | null>(null);
 function onDelete(id: number) {
   deleteId.value = id;
+  deleteSnapshot.value = (wps.all as any as Waypoint[]).find(w => (w.id as any) === id) ?? null;
   deleteOpen.value = true;
 }
 async function doDelete() {
   if (!deleteId.value) return;
+  const snap = deleteSnapshot.value;
   await wps.remove(deleteId.value);
   await wps.refreshAll();
+  actions.show('Waypoint deleted', {
+    kind: 'success',
+    canUndo: !!snap,
+    onUndo: snap ? async () => {
+      await wps.create({ name: snap.name, lat: snap.lat, lon: snap.lon, elev_m: snap.elev_m ?? null });
+      await wps.refreshAll();
+    } : undefined
+  });
 }
 
 // Attach to trail

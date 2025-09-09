@@ -101,7 +101,8 @@
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonSearchbar, IonList, IonItem, IonLabel,
-  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonToggle
+  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonToggle,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -236,28 +237,31 @@ function onExport() { showTodo('Export — will implement later'); }
 onMounted(async () => {
   await Promise.all([wps.refreshAll(), trails.refresh()]);
   units.value = await getUnits();
-  // 1) Prefer explicit center passed from previous page via query param: ?center=lat,lon
+  // If a center is explicitly provided, pre-sort using it once during initial mount.
+  const center = getCenterFromRoute();
+  if (center) {
+    nearby.value = await wps.withDistanceFrom(center);
+  }
+});
+
+function getCenterFromRoute(): { lat: number; lon: number } | null {
   const center = parseCenterParam(route.query.center as any) ?? (
     route.query.lat != null && route.query.lon != null
       ? { lat: Number(route.query.lat), lon: Number(route.query.lon) }
       : null
   );
-  if (center && Number.isFinite(center.lat) && Number.isFinite(center.lon)) {
-    nearby.value = await wps.withDistanceFrom(center);
-    return;
-  }
+  if (center && Number.isFinite(center.lat) && Number.isFinite(center.lon)) return center;
+  return null;
+}
 
-  // 2) Otherwise, if location permission is already granted, recenter once and sort by distance.
-  try {
-    const status = await Geolocation.checkPermissions();
-    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted';
-    if (granted) {
-      await recenter({ enableHighAccuracy: true });
-      await refreshByDistance();
-    }
-  } catch {
-    // Ignore; no auto prompt on first view.
-  }
+onIonViewWillEnter(async () => {
+  // If no explicit center provided, automatically request location and sort by distance.
+  const explicitCenter = getCenterFromRoute();
+  if (explicitCenter) return; // Respect explicit location passed from previous page
+  const ok = await ensurePermissions();
+  if (!ok) return;
+  await recenter({ enableHighAccuracy: true });
+  await refreshByDistance();
 });
 </script>
 <style scoped>

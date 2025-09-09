@@ -1,4 +1,5 @@
 import type { Pinia } from 'pinia';
+import { markRaw } from 'vue';
 import { initAppDb } from '@/db/factory';
 import { TrailsRepo } from '@/data/repositories/trails.repo';
 import { WaypointsRepo } from '@/data/repositories/waypoints.repo';
@@ -20,11 +21,12 @@ declare module 'pinia' {
 
 export async function installRepositories(pinia: Pinia) {
   const db = await initAppDb();
-  const repos: Repos = {
-    trails: new TrailsRepo(db),
-    waypoints: new WaypointsRepo(db),
-    collections: new CollectionsRepo(db),
-    autoWaypoints: new AutoWaypointsRepo(db)
-  };
+  // Avoid Vue proxying class instances that may use private fields internally
+  const repos: Repos = markRaw({
+    trails: markRaw(new TrailsRepo(db)),
+    waypoints: markRaw(new WaypointsRepo(db)),
+    collections: markRaw(new CollectionsRepo(db)),
+    autoWaypoints: markRaw(new AutoWaypointsRepo(db))
+  } as Repos);
   pinia.use(() => ({ $repos: repos }));
 }

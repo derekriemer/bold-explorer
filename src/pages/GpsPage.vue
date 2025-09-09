@@ -20,10 +20,11 @@
       <div class="ion-padding">
         <ion-item v-if="scope === 'waypoint'">
           <ion-label>Waypoint</ion-label>
-          <ion-select v-model=" selectedWaypointId " interface="popover" aria-label="Select waypoint">
+          <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected" aria-label="Select waypoint">
             <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
               }}</ion-select-option>
           </ion-select>
+          <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null" @click=" clearWaypoint " aria-label="Clear selected waypoint">Clear</ion-button>
         </ion-item>
 
         <template v-else>
@@ -48,15 +49,15 @@
         <ion-card>
           <ion-card-content>
             <div class="telemetry">
-              <div class="telemetry-item">
-                <div class="label">Heading</div>
-                <div class="value">{{ headingDisplay }}</div>
-              </div>
-              <div class="telemetry-item">
-                <div class="label">Compass</div>
+              <div v-if="!isWeb" class="telemetry-item">
+                <div class="label">{{ compassLabel }}</div>
                 <div class="value">{{ compassText }}</div>
               </div>
-              <div class="telemetry-item">
+              <div v-if="targetCoord" class="telemetry-item">
+                <div class="label">{{ bearingLabel }}</div>
+                <div class="value">{{ bearingDisplay }}</div>
+              </div>
+              <div v-if="targetCoord" class="telemetry-item">
                 <div class="label">Distance</div>
                 <div class="value">{{ distanceDisplay }}</div>
               </div>
@@ -72,6 +73,13 @@
           <ion-item lines="none">
             <ion-label>Show Debug</ion-label>
             <ion-toggle v-model=" debugOpen " aria-label="Toggle diagnostics panel"></ion-toggle>
+          </ion-item>
+          <ion-item lines="none">
+            <ion-label>Heading</ion-label>
+            <ion-segment v-model=" compassMode " aria-label="Heading source">
+              <ion-segment-button value="magnetic"><ion-label>Magnetic</ion-label></ion-segment-button>
+              <ion-segment-button value="true"><ion-label>True</ion-label></ion-segment-button>
+            </ion-segment>
           </ion-item>
           <ion-button fill="outline" size="small" @click=" runDiagnostics " aria-label="Run diagnostics">Run
             Diagnostics</ion-button>
@@ -91,6 +99,10 @@
               <div><span class="k">Waypoints(all):</span> <span class="v">{{ waypointsAll.length }}</span></div>
               <div v-if="selectedTrailId"><span class="k">Waypoints(trail):</span> <span class="v">{{
                 (wps.byTrail[selectedTrailId] ?? []).length }}</span></div>
+              <div><span class="k">Compass abs:</span> <span class="v">{{ orientationAbs === true ? 'true' : orientationAbs === false ? 'false' : '—' }}</span></div>
+              <div><span class="k">alpha:</span> <span class="v">{{ alpha != null ? alpha.toFixed(1) : '—' }}</span></div>
+              <div><span class="k">beta:</span> <span class="v">{{ beta != null ? beta.toFixed(1) : '—' }}</span></div>
+              <div><span class="k">gamma:</span> <span class="v">{{ gamma != null ? gamma.toFixed(1) : '—' }}</span></div>
               <div><span class="k">Repos installed:</span> <span class="v">{{ diag?.repos ?? '—' }}</span></div>
               <div><span class="k">Query OK:</span> <span class="v">{{ diag?.queryOk ?? '—' }}</span></div>
               <div><span class="k">Create OK:</span> <span class="v">{{ diag?.createOk ?? '—' }}</span></div>
@@ -114,17 +126,19 @@ import
   IonSegment, IonSegmentButton, IonLabel, IonItem, IonSelect, IonSelectOption,
   IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton
 } from '@ionic/vue';
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { Capacitor } from '@capacitor/core';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useGeolocation } from '@/composables/useGeolocation';
-import { useCompass } from '@/composables/useCompass';
+import { Motion } from '@capacitor/motion';
 import { useFollowTrail } from '@/composables/useFollowTrail';
-import { haversineDistanceMeters } from '@/utils/geo';
-import { getUnits } from '@/data/storage/prefs/preferences.service';
+import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
+import { getUnits, getCompassMode, setCompassMode } from '@/data/storage/prefs/preferences.service';
 import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
+import { Heading } from '@/plugins/heading';
 
 type Scope = 'waypoint' | 'trail';
 
@@ -137,17 +151,27 @@ const selectedWaypointId = ref<number | null>(null);
 const selectedTrailId = ref<number | null>(null);
 
 const { current: gps, start: startGps, recenter: recenterGps, ensurePermissions, autoStartOnMounted } = useGeolocation();
-const { reading: compass, autoStartOnMounted: autoStartCompass } = useCompass();
 
 const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
   useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
 
 const units = ref<'metric' | 'imperial'>('metric');
+const compassMode = ref<'magnetic' | 'true'>('magnetic');
 // Audio cues moved to Settings page
 const actions = useActions();
 const debugOpen = ref(false);
 const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
+const isWeb = Capacitor.getPlatform() === 'web';
+// Local heading + orientation debug state (replacing useCompass)
+const headingMag = ref<number | null>(null);
+const headingTrue = ref<number | null>(null);
+const orientationAbs = ref<boolean | undefined>(undefined);
+const alpha = ref<number | null>(null);
+const beta = ref<number | null>(null);
+const gamma = ref<number | null>(null);
+let removeHeadingListener: (() => void) | null = null;
+let removeMotionListener: (() => void) | null = null;
 
 const targetCoord = computed(() =>
 {
@@ -165,19 +189,44 @@ const targetCoord = computed(() =>
   return null;
 });
 
-// Use magnetic heading from device orientation (Motion)
-const headingDeg = computed(() => compass.value.heading ?? null);
+// Bearing to target from GPS position (not compass heading)
+const bearingDeg = computed(() =>
+  (gps.value && targetCoord.value)
+    ? initialBearingDeg({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value)
+    : null
+);
 const distanceM = computed(() => (gps.value && targetCoord.value) ? haversineDistanceMeters({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value) : null);
 
-const headingDisplay = computed(() => headingDeg.value != null ? `${ headingDeg.value.toFixed(0) }°` : '—');
+const bearingDisplay = computed(() => bearingDeg.value != null ? `${ bearingDeg.value.toFixed(0) }°` : '—');
+// Heading used for compass display, from native plugin when available
+const compassHeadingDeg = computed(() =>
+{
+  if (compassMode.value === 'true') return headingTrue.value ?? headingMag.value;
+  return headingMag.value ?? headingTrue.value;
+});
+const targetName = computed(() =>
+{
+  if (scope.value === 'waypoint')
+  {
+    const t = waypointsAll.value.find(w => w.id === selectedWaypointId.value);
+    return t?.name ?? null;
+  }
+  if (scope.value === 'trail')
+  {
+    return next.value?.name ?? null;
+  }
+  return null;
+});
+const bearingLabel = computed(() => targetName.value ? `Bearing to ${ targetName.value }` : 'Bearing');
 const compassText = computed(() =>
 {
-  const h = headingDeg.value;
+  const h = compassHeadingDeg.value;
   if (h == null) return '—';
   const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const idx = Math.round(h / 22.5) % 16;
   return `${ dirs[idx] } ${ h.toFixed(0) }°`;
 });
+const compassLabel = computed(() => `Compass (${ compassMode.value === 'true' ? 'True' : 'Magnetic' })`);
 const distanceDisplay = computed(() =>
 {
   if (distanceM.value == null) return '—';
@@ -204,6 +253,11 @@ async function toggleFollow ()
 async function recenter ()
 {
   await recenterGps();
+}
+
+function clearWaypoint ()
+{
+  selectedWaypointId.value = null;
 }
 
 // Audio cues toggle moved to Settings page
@@ -283,6 +337,34 @@ onMounted(async () =>
 {
   await Promise.all([trails.refresh(), wps.refreshAll()]);
   units.value = await getUnits();
+  compassMode.value = await getCompassMode();
+  if (!isWeb)
+  {
+    try
+    {
+      const sub = await Heading.addListener('heading', (evt) =>
+      {
+        const mag = typeof (evt as any)?.magnetic === 'number' ? (evt as any).magnetic : null;
+        const tru = typeof (evt as any)?.true === 'number' ? (evt as any).true : null;
+        headingMag.value = mag;
+        headingTrue.value = tru;
+        orientationAbs.value = true;
+      });
+      await Heading.start({ useTrueNorth: true });
+      removeHeadingListener = () => { sub.remove(); void Heading.stop(); };
+    } catch {}
+    try
+    {
+      const sub2 = await Motion.addListener('orientation', (event: any) =>
+      {
+        alpha.value = typeof event?.alpha === 'number' ? event.alpha : null;
+        beta.value = typeof event?.beta === 'number' ? event.beta : null;
+        gamma.value = typeof event?.gamma === 'number' ? event.gamma : null;
+        orientationAbs.value = event?.absolute;
+      });
+      removeMotionListener = () => { sub2.remove(); };
+    } catch {}
+  }
 });
 
 autoStartOnMounted({
@@ -295,12 +377,28 @@ autoStartOnMounted({
   }
 });
 
-// Start compass listener on mount
-autoStartCompass();
+onBeforeUnmount(() =>
+{
+  try { removeHeadingListener?.(); } catch {}
+  try { removeMotionListener?.(); } catch {}
+  removeHeadingListener = null; removeMotionListener = null;
+});
+
+watch(compassMode, async (m) => { try { await setCompassMode(m); } catch {} });
 
 watch(selectedTrailId, async (id) =>
 {
   if (id != null) await wps.loadForTrail(id);
+});
+
+// Feed location to native Heading plugin for true north declination
+watch(gps, async (pos) =>
+{
+  if (!pos) return;
+  if (isWeb) return;
+  try {
+    await Heading.setLocation?.({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
+  } catch { /* ignore */ }
 });
 </script>
 <style scoped>

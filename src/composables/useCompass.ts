@@ -1,9 +1,18 @@
 import { ref, onBeforeUnmount, onMounted } from 'vue';
+import { Capacitor } from '@capacitor/core';
+import { Heading } from '@/plugins/heading';
 import { Motion } from '@capacitor/motion';
 
 export interface CompassReading {
-  heading: number | null; // degrees 0-360, where 0 ≈ North
-  absolute?: boolean;
+  // Preferred fields to render
+  magnetic: number | null; // 0..360, magnetic north referenced
+  true?: number | null;    // 0..360, true north if available
+  // Raw/fallback
+  heading?: number | null; // legacy convenience
+  absolute?: boolean;      // Earth-frame available (Motion)
+  alpha?: number | null;   // raw device alpha (z-axis), as provided by Motion
+  beta?: number | null;    // raw device beta (x-axis)
+  gamma?: number | null;   // raw device gamma (y-axis)
 }
 
 /**
@@ -11,7 +20,7 @@ export interface CompassReading {
  * Uses `alpha` (z-axis rotation) from device orientation as heading degrees.
  */
 export function useCompass() {
-  const reading = ref<CompassReading>({ heading: null, absolute: undefined });
+  const reading = ref<CompassReading>({ magnetic: null, true: null, heading: null, absolute: undefined });
   const watching = ref(false);
   let removeListener: (() => void) | null = null;
 
@@ -33,16 +42,51 @@ export function useCompass() {
     return h;
   }
 
+  function toCompassHeading(event: any): number | null {
+    // Use Capacitor Motion orientation event's alpha only; do not rely on webkit/device APIs
+    const alpha = typeof event?.alpha === 'number' ? event.alpha : null;
+    if (alpha == null) return null;
+    // Normalize to compass convention: 0° = North, 90° = East, clockwise positive.
+    // Prefer alpha as-is; many Android devices already report azimuth (0 = North, clockwise).
+    // When event.absolute is true, treat alpha as absolute heading relative to Earth.
+    const h = alpha;
+    return normalizeHeading(h);
+  }
+
+  // No longer use window plugin probing; prefer our Capacitor plugin wrapper `Heading`.
+
   async function start() {
     if (watching.value) return;
     const granted = await requestPermissionIfNeeded();
     if (!granted) return;
     watching.value = true;
+    const isWeb = Capacitor.getPlatform() === 'web';
+    if (!isWeb) {
+      try {
+        const sub = await Heading.addListener('heading', (evt) => {
+          // evt: { magnetic, true?, accuracy? }
+          const mag = typeof evt?.magnetic === 'number' ? normalizeHeading(evt.magnetic) : null;
+          const tru = typeof evt?.true === 'number' ? normalizeHeading(evt.true) : null;
+          reading.value = { magnetic: mag, true: tru, heading: tru ?? mag, absolute: true, alpha: null, beta: null, gamma: null };
+        });
+        await Heading.start({ useTrueNorth: true });
+        removeListener = () => { sub.remove(); void Heading.stop(); };
+        return;
+      } catch (e) {
+        // Fall through to Motion fallback if plugin not available or fails
+      }
+    }
+    // Fallback: Capacitor Motion orientation
     const listener = await Motion.addListener('orientation', (event: any) => {
-      // event: { alpha, beta, gamma, absolute? }
+      const h = toCompassHeading(event);
       reading.value = {
-        heading: normalizeHeading(event?.alpha),
-        absolute: event?.absolute
+        magnetic: h,
+        true: null,
+        heading: h,
+        absolute: event?.absolute,
+        alpha: typeof event?.alpha === 'number' ? event.alpha : null,
+        beta: typeof event?.beta === 'number' ? event.beta : null,
+        gamma: typeof event?.gamma === 'number' ? event.gamma : null
       };
     });
     removeListener = () => listener.remove();
@@ -62,4 +106,3 @@ export function useCompass() {
 
   return { reading, watching, start, stop, autoStartOnMounted };
 }
-

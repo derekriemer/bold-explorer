@@ -13,6 +13,12 @@
       <ion-toolbar>
         <ion-searchbar v-model="query" placeholder="Search by name" aria-label="Search waypoints" />
       </ion-toolbar>
+      <ion-toolbar>
+        <ion-item lines="none">
+          <ion-label>Live Location Updates</ion-label>
+          <ion-toggle v-model="liveUpdates" @ionChange="onToggleLive" aria-label="Toggle live location updates" />
+        </ion-item>
+      </ion-toolbar>
     </ion-header>
     <ion-content>
       <ion-list>
@@ -20,7 +26,11 @@
           <ion-item>
             <ion-label>
               <h2>{{ wp.name }}</h2>
-              <p>{{ wp.lat.toFixed(5) }}, {{ wp.lon.toFixed(5) }}<span v-if="wp.elev_m != null"> · {{ wp.elev_m }} m</span></p>
+              <p>
+                {{ wp.lat.toFixed(5) }}, {{ wp.lon.toFixed(5) }}
+                <span v-if="wp.elev_m != null"> · {{ wp.elev_m }} m</span>
+                <span v-if="'distance_m' in wp"> · {{ formatDistance((wp as any).distance_m, units) }}</span>
+              </p>
             </ion-label>
           </ion-item>
           <ion-item-options side="end">
@@ -83,21 +93,56 @@
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonSearchbar, IonList, IonItem, IonLabel,
-  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert
+  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonToggle
 } from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
+import { useGeolocation } from '@/composables/useGeolocation';
+import { formatDistance as fmtDistance } from '@/composables/useDistance';
+import { getUnits } from '@/data/storage/prefs/preferences.service';
 
 const wps = useWaypoints();
 const trails = useTrails();
+const { current: gps, start, stop, recenter, ensurePermissions } = useGeolocation();
 
 const query = ref('');
+type WpWithDistance = ReturnType<typeof useWaypoints> extends infer T ? T extends { withDistanceFrom: any } ? (Awaited<ReturnType<T['withDistanceFrom']>>[number]) : never : never;
+const units = ref<'metric' | 'imperial'>('metric');
+const nearby = ref<WpWithDistance[] | null>(null);
+const liveUpdates = ref(false);
+
+const formatDistance = (d: number, u: 'metric' | 'imperial') => fmtDistance(d, u);
+
+const baseList = computed(() => nearby.value ?? wps.all);
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
-  if (!q) return wps.all;
-  return wps.all.filter(w => w.name.toLowerCase().includes(q));
+  const list = baseList.value;
+  if (!q) return list as any;
+  return (list as any).filter((w: any) => w.name.toLowerCase().includes(q));
+});
+
+async function refreshByDistance() {
+  if (!gps.value) return;
+  nearby.value = await wps.withDistanceFrom({ lat: gps.value.lat, lon: gps.value.lon });
+}
+
+async function onToggleLive() {
+  if (liveUpdates.value) {
+    const ok = await ensurePermissions();
+    if (!ok) { liveUpdates.value = false; return; }
+    await start({ enableHighAccuracy: true });
+    await recenter({ enableHighAccuracy: true });
+    await refreshByDistance();
+  } else {
+    await stop();
+  }
+}
+
+watch(gps, async (pos) => {
+  if (!liveUpdates.value) return;
+  if (pos) await refreshByDistance();
 });
 
 const toastOpen = ref(false);
@@ -178,6 +223,7 @@ function onExport() { showTodo('Export — will implement later'); }
 
 onMounted(async () => {
   await Promise.all([wps.refreshAll(), trails.refresh()]);
+  units.value = await getUnits();
 });
 </script>
 <style scoped>

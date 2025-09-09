@@ -1,7 +1,7 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
-import { sqlDistanceMetersForAlias, EARTH_R } from '@/utils/geo';
+import { sqlDistanceMetersForAlias, EARTH_R, fetchWaypointsWithDistance } from '@/utils/geo';
 
 const RAD = 0.017453292519943295;
 const EARTH_R = 6371000;
@@ -178,23 +178,6 @@ export class WaypointsRepo {
   }
 
   async withDistanceFrom(center: { lat: number; lon: number }, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
-    const distanceExpr = sqlDistanceMetersForAlias('w', center);
-
-    const base = this.db
-      .selectFrom('waypoint as w')
-      .$if(!!opts?.trailId, (qb: any) =>
-        qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
-      );
-
-    const rows = await base
-      .select([
-        'w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
-        distanceExpr
-      ])
-      .orderBy('distance_m')
-      .$if(!!opts?.limit, (qb: any) => qb.limit(opts!.limit!))
-      .execute();
-
-    return rows as Array<Selectable<Waypoint> & { distance_m: number }>;
+    return fetchWaypointsWithDistance(this.db, center, opts);
   }
 }

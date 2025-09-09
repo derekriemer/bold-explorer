@@ -1,4 +1,6 @@
+import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
+import type { DB, Waypoint } from '@/db/schema';
 
 const RAD = Math.PI / 180;
 export const EARTH_R = 6371000;
@@ -45,4 +47,29 @@ export function sqlDistanceMetersForAlias(alias: string, center: { lat: number; 
       )
     )
   `.as('distance_m');
+}
+
+// High-level helper: fetch waypoints with computed distance from center, ordered ascending.
+export async function fetchWaypointsWithDistance(
+  db: Kysely<DB>,
+  center: { lat: number; lon: number },
+  opts?: { trailId?: number; limit?: number }
+): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
+  const distanceExpr = sqlDistanceMetersForAlias('w', center);
+  const base = db
+    .selectFrom('waypoint as w')
+    .$if(!!opts?.trailId, (qb: any) =>
+      qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
+    );
+
+  const rows = await base
+    .select([
+      'w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
+      distanceExpr
+    ])
+    .orderBy('distance_m')
+    .$if(!!opts?.limit, (qb: any) => qb.limit(opts!.limit!))
+    .execute();
+
+  return rows as Array<Selectable<Waypoint> & { distance_m: number }>;
 }

@@ -2,6 +2,9 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-back-button default-href="/tabs/gps" />
+        </ion-buttons>
         <ion-title>Settings</ion-title>
       </ion-toolbar>
     </ion-header>
@@ -30,7 +33,8 @@
 <script setup lang="ts">
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonList, IonItem, IonLabel, IonToggle, IonSegment, IonSegmentButton
+  IonList, IonItem, IonLabel, IonToggle, IonSegment, IonSegmentButton,
+  IonButtons, IonBackButton
 } from '@ionic/vue';
 import { ref, onMounted } from 'vue';
 import { getUnits, setUnits, getAudioCuesEnabled, setAudioCuesEnabled } from '@/data/storage/prefs/preferences.service';
@@ -51,4 +55,3 @@ onMounted(async () => {
   audioCues.value = await getAudioCuesEnabled();
 });
 </script>
-

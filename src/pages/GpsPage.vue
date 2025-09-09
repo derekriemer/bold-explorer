@@ -3,11 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>GPS</ion-title>
-        <ion-buttons slot="end">
-          <ion-button :router-link="'/tabs/settings'" aria-label="Settings">
-            <ion-icon slot="icon-only" :icon="settingsOutline" />
-          </ion-button>
-        </ion-buttons>
+        <PageHeaderToolbar />
       </ion-toolbar>
       <ion-toolbar>
         <ion-segment v-model=" scope " aria-label="Selection scope">
@@ -116,10 +112,8 @@ import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonSegment, IonSegmentButton, IonLabel, IonItem, IonSelect, IonSelectOption,
-  IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton,
-  IonButtons, IonIcon
+  IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton
 } from '@ionic/vue';
-import { settingsOutline } from 'ionicons/icons';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
@@ -130,6 +124,7 @@ import { haversineDistanceMeters } from '@/utils/geo';
 import { getUnits } from '@/data/storage/prefs/preferences.service';
 import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
+import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 
 type Scope = 'waypoint' | 'trail';
 

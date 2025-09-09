@@ -1,4 +1,5 @@
 import type { Kysely, Selectable } from 'kysely';
+import { sql } from 'kysely';
 import type { DB, Trail } from '@/db/schema';
 
 export class TrailsRepo {
@@ -9,16 +10,17 @@ export class TrailsRepo {
   }
 
   async create(input: { name: string; description?: string | null }): Promise<number> {
-    const res = await this.db
+    await this.db
       .insertInto('trail')
       .values({
         name: input.name,
         description: input.description ?? null,
         created_at: new Date().toISOString()
       })
-      .returning('id')
-      .executeTakeFirst();
-    return Number(res!.id);
+      .execute();
+    const rows = await sql<{ id: number }>`select last_insert_rowid() as id`.execute(this.db as any);
+    const id = Array.isArray(rows) ? (rows[0] as any)?.id : (rows as any)?.rows?.[0]?.id;
+    return Number(id ?? 0);
   }
 
   rename(id: number, name: string): Promise<void> {

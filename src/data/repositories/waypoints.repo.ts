@@ -13,7 +13,7 @@ export class WaypointsRepo {
   }
 
   async create(input: { name: string; lat: number; lon: number; elev_m?: number | null }): Promise<number> {
-    const res = await this.db
+    await this.db
       .insertInto('waypoint')
       .values({
         name: input.name,
@@ -22,9 +22,12 @@ export class WaypointsRepo {
         elev_m: input.elev_m ?? null,
         created_at: new Date().toISOString()
       })
-      .returning('id')
-      .executeTakeFirst();
-    return Number(res!.id);
+      .execute();
+    const rows = await sql<{ id: number }>`select last_insert_rowid() as id`.execute(this.db as any);
+    // Kysely RawBuilder.execute returns an array of rows on SELECT
+    // Fall back to 0 if shape differs
+    const id = Array.isArray(rows) ? (rows[0] as any)?.id : (rows as any)?.rows?.[0]?.id;
+    return Number(id ?? 0);
   }
 
   async addToTrail(input: { trailId: number; name: string; lat: number; lon: number; elev_m?: number | null; position?: number }): Promise<{ waypointId: number; position: number }> {

@@ -6,15 +6,19 @@ import path from 'path'
 import { defineConfig } from 'vite'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
-    legacy()
+    ...(command === 'build' ? [legacy()] : [])
   ],
+  server: {
+    sourcemapIgnoreList: () => false,
+    watch: { usePolling: true, interval: 100 }
+  },
   build: {
+    sourcemap: true,
     rollupOptions: {
       external: [
-        // Native-only; not bundled for web
         'better-sqlite3'
       ]
     }
@@ -28,4 +32,4 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom'
   }
-})
+}))

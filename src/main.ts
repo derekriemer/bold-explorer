@@ -38,6 +38,11 @@ import '@ionic/vue/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 async function bootstrap() {
+  // Improve debugging in dev: deeper stack traces
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Error as any).stackTraceLimit = 50;
+  }
   // Register the jeep-sqlite custom element (web sqlite bridge)
   if (typeof window !== 'undefined') {
     jeepSqlite(window);

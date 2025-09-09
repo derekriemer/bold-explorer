@@ -15,15 +15,44 @@ export function useGeolocation() {
   });
 
   async function recenter(options?: PositionOptions) {
-    const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, ...options });
-    current.value = toCoords(pos);
+    // Helpful callsite for sourcemaps when debugging
+    // eslint-disable-next-line no-console
+    console.debug('[useGeolocation] recenter() invoked', { options });
+    try {
+      const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, ...options });
+      current.value = toCoords(pos);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[useGeolocation] recenter() failed via Capacitor', e);
+      // Fallback to browser geolocation if available (helps during web dev)
+      if (typeof navigator !== 'undefined' && navigator.geolocation?.getCurrentPosition) {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, options as PositionOptions | undefined)
+        );
+        current.value = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          heading: pos.coords.heading ?? null,
+          altitude: pos.coords.altitude ?? null
+        };
+        // eslint-disable-next-line no-console
+        console.info('[useGeolocation] recenter() succeeded via browser fallback');
+      } else {
+        throw e;
+      }
+    }
   }
 
   async function start(options?: PositionOptions) {
     if (watching.value) return;
     watching.value = true;
     watchId = await Geolocation.watchPosition({ enableHighAccuracy: true, ...options }, (pos, err) => {
-      if (err) return;
+      if (err) {
+        // eslint-disable-next-line no-console
+        console.error('[useGeolocation] watchPosition error', err);
+        return;
+      }
       if (pos) current.value = toCoords(pos);
     });
   }

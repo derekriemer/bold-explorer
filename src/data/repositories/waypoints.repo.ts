@@ -31,11 +31,10 @@ export class WaypointsRepo {
   }
 
   async addToTrail(input: { trailId: number; name: string; lat: number; lon: number; elev_m?: number | null; position?: number }): Promise<{ waypointId: number; position: number }> {
-    return this.db.transaction().execute(async (trx: Kysely<DB>) => {
-      const waypointId = await new WaypointsRepo(trx as any).create(input);
-      const position = await this.attachToTrail(trx as any, input.trailId, waypointId, input.position);
-      return { waypointId, position };
-    });
+    // Avoid transaction on web/sql.js driver to prevent private field binding issues
+    const waypointId = await this.create(input);
+    const position = await this.attachToTrail(this.db, input.trailId, waypointId, input.position);
+    return { waypointId, position };
   }
 
   private async attachToTrail(db: Kysely<DB>, trailId: number, waypointId: number, position?: number) {

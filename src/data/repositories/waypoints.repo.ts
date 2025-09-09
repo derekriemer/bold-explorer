@@ -183,4 +183,33 @@ export class WaypointsRepo {
     const nearby = opts?.includeDistance ? rows.filter((r: any) => (r as any).distance_m <= radiusM) : rows;
     return opts?.limit ? nearby.slice(0, opts.limit) : nearby;
   }
+
+  async withDistanceFrom(center: { lat: number; lon: number }, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
+    const distanceExpr = sql<number>`
+      ${2 * EARTH_R} * asin(
+        sqrt(
+          pow(sin((${RAD} * (w.lat - ${center.lat})) / 2.0), 2) +
+          cos(${RAD} * ${center.lat}) * cos(${RAD} * w.lat) *
+          pow(sin((${RAD} * (w.lon - ${center.lon})) / 2.0), 2)
+        )
+      )
+    `.as('distance_m');
+
+    const base = this.db
+      .selectFrom('waypoint as w')
+      .$if(!!opts?.trailId, (qb: any) =>
+        qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
+      );
+
+    const rows = await base
+      .select([
+        'w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
+        distanceExpr
+      ])
+      .orderBy('distance_m')
+      .$if(!!opts?.limit, (qb: any) => qb.limit(opts!.limit!))
+      .execute();
+
+    return rows as Array<Selectable<Waypoint> & { distance_m: number }>;
+  }
 }

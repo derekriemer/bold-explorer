@@ -41,6 +41,9 @@ export const useWaypoints = defineStore('waypoints', {
     },
     async remove(id: number) {
       await this.$repos.waypoints.remove(id);
+    },
+    async withDistanceFrom(center: { lat: number; lon: number }, opts?: { trailId?: number; limit?: number }) {
+      return this.$repos.waypoints.withDistanceFrom(center, opts);
     }
   }
 });

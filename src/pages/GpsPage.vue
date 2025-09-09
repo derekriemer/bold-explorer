@@ -5,7 +5,7 @@
         <ion-title>GPS</ion-title>
       </ion-toolbar>
       <ion-toolbar>
-        <ion-segment v-model="scope" aria-label="Selection scope">
+        <ion-segment v-model=" scope " aria-label="Selection scope">
           <ion-segment-button value="waypoint" aria-label="Waypoint scope">
             <ion-label>Waypoint</ion-label>
           </ion-segment-button>
@@ -19,16 +19,17 @@
       <div class="ion-padding">
         <ion-item v-if="scope === 'waypoint'">
           <ion-label>Waypoint</ion-label>
-          <ion-select v-model="selectedWaypointId" interface="popover" aria-label="Select waypoint">
-            <ion-select-option v-for="wp in waypointsAll" :key="wp.id" :value="wp.id">{{ wp.name }}</ion-select-option>
+          <ion-select v-model=" selectedWaypointId " interface="popover" aria-label="Select waypoint">
+            <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
+            }}</ion-select-option>
           </ion-select>
         </ion-item>
 
         <template v-else>
           <ion-item>
             <ion-label>Trail</ion-label>
-            <ion-select v-model="selectedTrailId" interface="popover" aria-label="Select trail">
-              <ion-select-option v-for="t in trails.list" :key="t.id" :value="t.id">{{ t.name }}</ion-select-option>
+            <ion-select v-model=" selectedTrailId " interface="popover" aria-label="Select trail">
+              <ion-select-option v-for="t in trails.list" :key=" t.id " :value=" t.id ">{{ t.name }}</ion-select-option>
             </ion-select>
           </ion-item>
           <ion-item v-if="selectedTrailId">
@@ -36,7 +37,8 @@
               <div>Current: {{ active && next ? currentIndex + 1 : '-' }}</div>
               <div>Next: {{ next?.name ?? '-' }}</div>
             </ion-label>
-            <ion-button fill="outline" size="small" @click="toggleFollow" :aria-label="active ? 'Stop following' : 'Start following'">
+            <ion-button fill="outline" size="small" @click=" toggleFollow "
+              :aria-label=" active ? 'Stop following' : 'Start following' ">
               {{ active ? 'Stop' : 'Start' }}
             </ion-button>
           </ion-item>
@@ -45,26 +47,37 @@
         <ion-card>
           <ion-card-content>
             <div class="telemetry">
-              <div class="telemetry-item"><div class="label">Heading</div><div class="value">{{ headingDisplay }}</div></div>
-              <div class="telemetry-item"><div class="label">Compass</div><div class="value">{{ compassText }}</div></div>
-              <div class="telemetry-item"><div class="label">Distance</div><div class="value">{{ distanceDisplay }}</div></div>
+              <div class="telemetry-item">
+                <div class="label">Heading</div>
+                <div class="value">{{ headingDisplay }}</div>
+              </div>
+              <div class="telemetry-item">
+                <div class="label">Compass</div>
+                <div class="value">{{ compassText }}</div>
+              </div>
+              <div class="telemetry-item">
+                <div class="label">Distance</div>
+                <div class="value">{{ distanceDisplay }}</div>
+              </div>
             </div>
           </ion-card-content>
         </ion-card>
 
-        <PositionReadout :lat="gps?.lat ?? null" :lon="gps?.lon ?? null" :elev_m="gps?.altitude ?? null" :accuracy="gps?.accuracy ?? null" :units="units" />
+        <PositionReadout :lat=" gps?.lat ?? null " :lon=" gps?.lon ?? null " :elev_m=" gps?.altitude ?? null "
+          :accuracy=" gps?.accuracy ?? null " :units=" units " />
 
         <div class="controls">
-          <ion-button @click="recenter" aria-label="Recenter or calibrate">Recenter/Calibrate</ion-button>
+          <ion-button @click=" recenter " aria-label="Recenter or calibrate">Recenter/Calibrate</ion-button>
           <ion-item lines="none">
             <ion-label>Audio Cues</ion-label>
-            <ion-toggle v-model="audioCues" @ionChange="saveAudioCues" aria-label="Toggle audio cues"></ion-toggle>
+            <ion-toggle v-model=" audioCues " @ionChange=" saveAudioCues " aria-label="Toggle audio cues"></ion-toggle>
           </ion-item>
           <ion-item lines="none">
             <ion-label>Show Debug</ion-label>
-            <ion-toggle v-model="debugOpen" aria-label="Toggle diagnostics panel"></ion-toggle>
+            <ion-toggle v-model=" debugOpen " aria-label="Toggle diagnostics panel"></ion-toggle>
           </ion-item>
-          <ion-button fill="outline" size="small" @click="runDiagnostics" aria-label="Run diagnostics">Run Diagnostics</ion-button>
+          <ion-button fill="outline" size="small" @click=" runDiagnostics " aria-label="Run diagnostics">Run
+            Diagnostics</ion-button>
         </div>
 
         <div class="sr-only" aria-live="polite">{{ announcement }}</div>
@@ -72,11 +85,15 @@
         <ion-card v-if="debugOpen">
           <ion-card-content>
             <div class="debug-grid">
-              <div><span class="k">GPS:</span> <span class="v">{{ gps ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}` : 'none' }}</span></div>
+              <div><span class="k">GPS:</span> <span class="v">{{ gps ? `${ gps.lat.toFixed(5) }, ${ gps.lon.toFixed(5)
+                }` :
+                'none'
+                  }}</span></div>
               <div><span class="k">Scope:</span> <span class="v">{{ scope }}</span></div>
               <div><span class="k">TrailId:</span> <span class="v">{{ selectedTrailId ?? '-' }}</span></div>
               <div><span class="k">Waypoints(all):</span> <span class="v">{{ waypointsAll.length }}</span></div>
-              <div v-if="selectedTrailId"><span class="k">Waypoints(trail):</span> <span class="v">{{ (wps.byTrail[selectedTrailId] ?? []).length }}</span></div>
+              <div v-if="selectedTrailId"><span class="k">Waypoints(trail):</span> <span class="v">{{
+                (wps.byTrail[selectedTrailId] ?? []).length }}</span></div>
               <div><span class="k">Repos installed:</span> <span class="v">{{ diag?.repos ?? '—' }}</span></div>
               <div><span class="k">Query OK:</span> <span class="v">{{ diag?.queryOk ?? '—' }}</span></div>
               <div><span class="k">Create OK:</span> <span class="v">{{ diag?.createOk ?? '—' }}</span></div>
@@ -88,13 +105,14 @@
       </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button @click="markWaypoint" aria-label="Mark waypoint">+</ion-fab-button>
+        <ion-fab-button @click=" markWaypoint " aria-label="Mark waypoint">+</ion-fab-button>
       </ion-fab>
     </ion-content>
   </ion-page>
 </template>
 <script setup lang="ts">
-import {
+import
+{
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonSegment, IonSegmentButton, IonLabel, IonItem, IonSelect, IonSelectOption,
   IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton
@@ -133,13 +151,16 @@ const actions = useActions();
 const debugOpen = ref(false);
 const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
 
-const targetCoord = computed(() => {
+const targetCoord = computed(() =>
+{
   if (!gps.value) return null;
-  if (scope.value === 'waypoint') {
+  if (scope.value === 'waypoint')
+  {
     const t = waypointsAll.value.find(w => w.id === selectedWaypointId.value);
     return t ? { lat: t.lat, lon: t.lon } : null;
   }
-  if (scope.value === 'trail') {
+  if (scope.value === 'trail')
+  {
     const t = next.value;
     return t ? { lat: t.lat, lon: t.lon } : null;
   }
@@ -150,100 +171,121 @@ const targetCoord = computed(() => {
 const headingDeg = computed(() => compass.value.heading ?? null);
 const distanceM = computed(() => (gps.value && targetCoord.value) ? haversineDistanceMeters({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value) : null);
 
-const headingDisplay = computed(() => headingDeg.value != null ? `${headingDeg.value.toFixed(0)}°` : '—');
-const compassText = computed(() => {
+const headingDisplay = computed(() => headingDeg.value != null ? `${ headingDeg.value.toFixed(0) }°` : '—');
+const compassText = computed(() =>
+{
   const h = headingDeg.value;
   if (h == null) return '—';
-  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const idx = Math.round(h / 22.5) % 16;
-  return `${dirs[idx]} ${h.toFixed(0)}°`;
+  return `${ dirs[idx] } ${ h.toFixed(0) }°`;
 });
-const distanceDisplay = computed(() => {
+const distanceDisplay = computed(() =>
+{
   if (distanceM.value == null) return '—';
-  if (units.value === 'imperial') {
+  if (units.value === 'imperial')
+  {
     const feet = distanceM.value * 3.28084;
-    return feet >= 528 ? `${(feet / 5280).toFixed(2)} mi` : `${feet.toFixed(0)} ft`;
+    return feet >= 528 ? `${ (feet / 5280).toFixed(2) } mi` : `${ feet.toFixed(0) } ft`;
   }
-  return distanceM.value >= 1000 ? `${(distanceM.value / 1000).toFixed(2)} km` : `${distanceM.value.toFixed(0)} m`;
+  return distanceM.value >= 1000 ? `${ (distanceM.value / 1000).toFixed(2) } km` : `${ distanceM.value.toFixed(0) } m`;
 });
 
-async function toggleFollow() {
+async function toggleFollow ()
+{
   if (!selectedTrailId.value) return;
-  if (active.value) {
+  if (active.value)
+  {
     stopFollow();
-  } else {
+  } else
+  {
     startFollow(0);
   }
 }
 
-async function recenter() {
+async function recenter ()
+{
   await recenterGps();
 }
 
-async function saveAudioCues() {
+async function saveAudioCues ()
+{
   await setAudioCuesEnabled(audioCues.value);
 }
 
-async function markWaypoint() {
-  if (!gps.value) {
+async function markWaypoint ()
+{
+  if (!gps.value)
+  {
     actions.show('No GPS fix yet. Tap Recenter and allow location access.', {
       kind: 'warning', placement: 'banner-top', durationMs: 2500
     });
     return;
   }
-  const point = { name: `WP ${new Date().toLocaleTimeString()}`, lat: gps.value.lat, lon: gps.value.lon, elev_m: null };
-  try {
-    if (scope.value === 'trail' && selectedTrailId.value) {
+  const point = { name: `WP ${ new Date().toLocaleTimeString() }`, lat: gps.value.lat, lon: gps.value.lon, elev_m: null };
+  try
+  {
+    if (scope.value === 'trail' && selectedTrailId.value)
+    {
       await wps.addToTrail(selectedTrailId.value, point);
       await wps.loadForTrail(selectedTrailId.value);
       actions.show('Waypoint added to trail', { kind: 'success' });
-    } else {
-      await wps.$repos.waypoints.create(point as any);
-      await wps.refreshAll();
+    } else
+    {
+      await wps.create(point);
       actions.show('Waypoint created', { kind: 'success' });
     }
-  } catch (err: any) {
-    console.error('Mark waypoint failed', err);
-    actions.show(`Failed to save waypoint: ${err?.message ?? String(err)}` , { kind: 'error', placement: 'banner-top', durationMs: null });
+  } catch (err: any)
+  {
+    console.error('This can't run, Mark waypoint failed', err);
+      actions.show(`Failed to save waypoint: ${ err?.message ?? String(err) }`, { kind: 'error', placement: 'banner-top', durationMs: null });
   }
 }
 
-async function runDiagnostics() {
+async function runDiagnostics ()
+{
   const out: any = {};
-  try {
+  try
+  {
     out.repos = !!wps?.$repos?.waypoints && typeof wps.$repos.waypoints.all === 'function';
     if (!out.repos) throw new Error('Pinia repos not installed');
     const list = await wps.$repos.waypoints.all();
     out.count = list.length;
     out.queryOk = true;
-  } catch (e: any) {
-    out.error = `Query failed: ${e?.message ?? String(e)}`;
+  } catch (e: any)
+  {
+    out.error = `Query failed: ${ e?.message ?? String(e) }`;
     diag.value = out;
     actions.show(out.error, { kind: 'error', placement: 'banner-top', durationMs: null });
     return;
   }
   // Try create/delete a temp waypoint to test write path
   let tempId: number | null = null;
-  try {
-    tempId = await wps.$repos.waypoints.create({ name: `diag-${Date.now()}`, lat: 0, lon: 0, elev_m: null } as any);
+  try
+  {
+    tempId = await wps.$repos.waypoints.create({ name: `diag-${ Date.now() }`, lat: 0, lon: 0, elev_m: null } as any);
     out.createOk = Number.isFinite(tempId);
-  } catch (e: any) {
-    out.error = `Create failed: ${e?.message ?? String(e)}`;
+  } catch (e: any)
+  {
+    out.error = `Create failed: ${ e?.message ?? String(e) }`;
     diag.value = out;
     actions.show(out.error, { kind: 'error', placement: 'banner-top', durationMs: null });
     return;
   }
-  try {
+  try
+  {
     if (tempId != null) await wps.$repos.waypoints.remove(tempId);
     out.deleteOk = true;
-  } catch (e: any) {
-    out.error = `Delete failed: ${e?.message ?? String(e)}`;
+  } catch (e: any)
+  {
+    out.error = `Delete failed: ${ e?.message ?? String(e) }`;
   }
   diag.value = out;
   actions.show('Diagnostics completed', { kind: out.error ? 'warning' : 'success' });
 }
 
-onMounted(async () => {
+onMounted(async () =>
+{
   await Promise.all([trails.refresh(), wps.refreshAll()]);
   units.value = await getUnits();
   audioCues.value = await getAudioCuesEnabled();
@@ -251,7 +293,8 @@ onMounted(async () => {
 
 autoStartOnMounted({
   recenter: true,
-  onDenied: () => {
+  onDenied: () =>
+  {
     actions.show('Location permission denied. Enable it in Settings to use GPS features.', {
       kind: 'error', placement: 'banner-top', durationMs: null, dismissLabel: 'Dismiss'
     });
@@ -261,7 +304,8 @@ autoStartOnMounted({
 // Start compass listener on mount
 autoStartCompass();
 
-watch(selectedTrailId, async (id) => {
+watch(selectedTrailId, async (id) =>
+{
   if (id != null) await wps.loadForTrail(id);
 });
 </script>
@@ -271,11 +315,50 @@ watch(selectedTrailId, async (id) => {
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
-.telemetry-item .label { color: var(--ion-color-medium); font-size: 0.85rem; }
-.telemetry-item .value { font-size: 1.5rem; font-weight: 600; }
-.controls { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; margin-top: 8px; }
-.debug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px; }
-.debug-grid .k { color: var(--ion-color-medium); margin-right: 6px; }
-.debug-grid .v.err { color: var(--ion-color-danger); }
-.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+.telemetry-item .label {
+  color: var(--ion-color-medium);
+  font-size: 0.85rem;
+}
+
+.telemetry-item .value {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.debug-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.debug-grid .k {
+  color: var(--ion-color-medium);
+  margin-right: 6px;
+}
+
+.debug-grid .v.err {
+  color: var(--ion-color-danger);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
 </style>

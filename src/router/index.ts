@@ -12,7 +12,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'gps', component: () => import('@/pages/GpsPage.vue') },
       { path: 'waypoints', component: () => import('@/pages/WaypointsPage.vue') },
       { path: 'trails', component: () => import('@/pages/TrailsPage.vue') },
-      { path: 'collections', component: () => import('@/pages/CollectionsPage.vue') }
+      { path: 'collections', component: () => import('@/pages/CollectionsPage.vue') },
+      { path: 'settings', component: () => import('@/pages/SettingsPage.vue') }
     ]
   }
 ];

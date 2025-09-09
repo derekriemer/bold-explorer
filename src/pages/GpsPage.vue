@@ -3,6 +3,11 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>GPS</ion-title>
+        <ion-buttons slot="end">
+          <ion-button :router-link="'/tabs/settings'" aria-label="Settings">
+            <ion-icon slot="icon-only" :icon="settingsOutline" />
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
       <ion-toolbar>
         <ion-segment v-model=" scope " aria-label="Selection scope">
@@ -21,7 +26,7 @@
           <ion-label>Waypoint</ion-label>
           <ion-select v-model=" selectedWaypointId " interface="popover" aria-label="Select waypoint">
             <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
-            }}</ion-select-option>
+              }}</ion-select-option>
           </ion-select>
         </ion-item>
 
@@ -69,10 +74,6 @@
         <div class="controls">
           <ion-button @click=" recenter " aria-label="Recenter or calibrate">Recenter/Calibrate</ion-button>
           <ion-item lines="none">
-            <ion-label>Audio Cues</ion-label>
-            <ion-toggle v-model=" audioCues " @ionChange=" saveAudioCues " aria-label="Toggle audio cues"></ion-toggle>
-          </ion-item>
-          <ion-item lines="none">
             <ion-label>Show Debug</ion-label>
             <ion-toggle v-model=" debugOpen " aria-label="Toggle diagnostics panel"></ion-toggle>
           </ion-item>
@@ -115,8 +116,10 @@ import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonSegment, IonSegmentButton, IonLabel, IonItem, IonSelect, IonSelectOption,
-  IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton
+  IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton,
+  IonButtons, IonIcon
 } from '@ionic/vue';
+import { settingsOutline } from 'ionicons/icons';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
@@ -124,7 +127,7 @@ import { useGeolocation } from '@/composables/useGeolocation';
 import { useCompass } from '@/composables/useCompass';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { haversineDistanceMeters } from '@/utils/geo';
-import { getUnits, getAudioCuesEnabled, setAudioCuesEnabled } from '@/data/storage/prefs/preferences.service';
+import { getUnits } from '@/data/storage/prefs/preferences.service';
 import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 
@@ -146,7 +149,7 @@ const { active, currentIndex, next, start: startFollow, stop: stopFollow, announ
   useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
 
 const units = ref<'metric' | 'imperial'>('metric');
-const audioCues = ref(false);
+// Audio cues moved to Settings page
 const actions = useActions();
 const debugOpen = ref(false);
 const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
@@ -208,10 +211,7 @@ async function recenter ()
   await recenterGps();
 }
 
-async function saveAudioCues ()
-{
-  await setAudioCuesEnabled(audioCues.value);
-}
+// Audio cues toggle moved to Settings page
 
 async function markWaypoint ()
 {
@@ -237,8 +237,8 @@ async function markWaypoint ()
     }
   } catch (err: any)
   {
-    console.error('This can't run, Mark waypoint failed', err);
-      actions.show(`Failed to save waypoint: ${ err?.message ?? String(err) }`, { kind: 'error', placement: 'banner-top', durationMs: null });
+    console.error('Mark waypoint failed', err);
+    actions.show(`Failed to save waypoint: ${ err?.message ?? String(err) }`, { kind: 'error', placement: 'banner-top', durationMs: null });
   }
 }
 
@@ -288,7 +288,6 @@ onMounted(async () =>
 {
   await Promise.all([trails.refresh(), wps.refreshAll()]);
   units.value = await getUnits();
-  audioCues.value = await getAudioCuesEnabled();
 });
 
 autoStartOnMounted({

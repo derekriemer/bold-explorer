@@ -7,6 +7,9 @@
           <ion-button @click="onImport" aria-label="Import GPX">Import</ion-button>
           <ion-button @click="onExport" aria-label="Export selected">Export</ion-button>
           <ion-button color="primary" @click="onAdd" aria-label="Add waypoint">Add</ion-button>
+          <ion-button :router-link="'/tabs/settings'" aria-label="Settings">
+            <ion-icon slot="icon-only" :icon="settingsOutline" />
+          </ion-button>
         </ion-buttons>
       </ion-toolbar>
       <ion-toolbar>
@@ -82,8 +85,9 @@
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonSearchbar, IonList, IonItem, IonLabel,
-  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert
+  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonIcon
 } from '@ionic/vue';
+import { settingsOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';

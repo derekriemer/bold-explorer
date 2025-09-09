@@ -1,6 +1,7 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
+import { sqlDistanceMetersForAlias, EARTH_R } from '@/utils/geo';
 
 const RAD = 0.017453292519943295;
 const EARTH_R = 6371000;
@@ -161,15 +162,7 @@ export class WaypointsRepo {
       .where('w.lon', '>=', center.lon - degLon)
       .where('w.lon', '<=', center.lon + degLon);
 
-    const distanceExpr = sql<number>`
-      ${2 * EARTH_R} * asin(
-        sqrt(
-          pow(sin((${RAD} * (w.lat - ${center.lat})) / 2.0), 2) +
-          cos(${RAD} * ${center.lat}) * cos(${RAD} * w.lat) *
-          pow(sin((${RAD} * (w.lon - ${center.lon})) / 2.0), 2)
-        )
-      )
-    `.as('distance_m');
+    const distanceExpr = sqlDistanceMetersForAlias('w', center);
 
     const rows = await base
       .select([
@@ -185,15 +178,7 @@ export class WaypointsRepo {
   }
 
   async withDistanceFrom(center: { lat: number; lon: number }, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
-    const distanceExpr = sql<number>`
-      ${2 * EARTH_R} * asin(
-        sqrt(
-          pow(sin((${RAD} * (w.lat - ${center.lat})) / 2.0), 2) +
-          cos(${RAD} * ${center.lat}) * cos(${RAD} * w.lat) *
-          pow(sin((${RAD} * (w.lon - ${center.lon})) / 2.0), 2)
-        )
-      )
-    `.as('distance_m');
+    const distanceExpr = sqlDistanceMetersForAlias('w', center);
 
     const base = this.db
       .selectFrom('waypoint as w')

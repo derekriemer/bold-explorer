@@ -1,4 +1,7 @@
+import { sql } from 'kysely';
+
 const RAD = Math.PI / 180;
+export const EARTH_R = 6371000;
 
 export function haversineDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371000;
@@ -28,3 +31,18 @@ export function deltaHeadingDeg(heading: number, bearing: number): number {
   return d;
 }
 
+// Kysely SQL helper: compute haversine distance in meters for a table alias
+// Example: sqlDistanceMetersForAlias('w', {lat, lon}) -> RawBuilder<number> as 'distance_m'
+export function sqlDistanceMetersForAlias(alias: string, center: { lat: number; lon: number }) {
+  const latRef = sql.ref(`${alias}.lat`);
+  const lonRef = sql.ref(`${alias}.lon`);
+  return sql<number>`
+    ${2 * EARTH_R} * asin(
+      sqrt(
+        pow(sin((${RAD} * (${latRef} - ${center.lat})) / 2.0), 2) +
+        cos(${RAD} * ${center.lat}) * cos(${RAD} * ${latRef}) *
+        pow(sin((${RAD} * (${lonRef} - ${center.lon})) / 2.0), 2)
+      )
+    )
+  `.as('distance_m');
+}

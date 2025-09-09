@@ -8,7 +8,12 @@
     "build": "node scripts/copy-sqljs-wasm.cjs && vue-tsc && vite build",
     "preview": "vite preview",
     "test:e2e": "cypress run",
-    "test:unit": "vitest",
+    "test:unit": "vitest run",
+    "bench:db": "node scripts/bench-db.mjs",
+    "bench:db:web": "node scripts/bench-db.mjs --mode web",
+    "bench:db:native": "node scripts/bench-db.mjs --mode native",
+    "test:ab:web": "vitest run tests/unit/waypoints.repo.spec.ts",
+    "test:ab:native": "DB_NATIVE=1 vitest run tests/unit/waypoints.repo.native.spec.ts",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -45,7 +50,9 @@
     "cypress": "^13.5.0",
     "eslint": "^8.35.0",
     "eslint-plugin-vue": "^9.9.0",
+    "fake-indexeddb": "^6.0.0",
     "jsdom": "^22.1.0",
+    "sql.js": "1.11.0",
     "terser": "^5.4.0",
     "typescript": "~5.6.2",
     "vite": "~5.2.0",
@@ -61,5 +68,5 @@
       "sql.js": "1.11.0"
     }
   },
-  "description": "An Ionic project"
+  "description": "Offline-first waypoint/trail app using Ionic Vue, Pinia, and SQLite (Capacitor) via Kysely."
 }

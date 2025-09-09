@@ -79,7 +79,7 @@
         :inputs="addInputs"
         :buttons="[
           { text: 'Cancel', role: 'cancel' },
-          { text: 'Add', role: 'confirm', handler: (data: any) => doAdd(data) }
+          { text: 'Add', role: 'confirm', handler: (data: any) => handleAddConfirm(data) }
         ]"
         @didDismiss="addOpen = false"
       />
@@ -172,19 +172,28 @@ function showTodo(msg = 'Will implement later') {
 const addOpen = ref(false);
 const addInputs = [
   { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
-  { name: 'lat', type: 'number', placeholder: 'Latitude', attributes: { step: 'any', 'aria-label': 'Latitude' } },
-  { name: 'lon', type: 'number', placeholder: 'Longitude', attributes: { step: 'any', 'aria-label': 'Longitude' } },
+  { name: 'lat', type: 'number', placeholder: 'Latitude', attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
+  { name: 'lon', type: 'number', placeholder: 'Longitude', attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
   { name: 'elev_m', type: 'number', placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
 ];
 function onAdd() { addOpen.value = true; }
-async function doAdd(data: any) {
+function isValidLat(lat: number): boolean { return Number.isFinite(lat) && lat >= -90 && lat <= 90; }
+function isValidLon(lon: number): boolean { return Number.isFinite(lon) && lon >= -180 && lon <= 180; }
+function handleAddConfirm(data: any): boolean {
   const name = String(data?.name ?? '').trim();
   const lat = Number(data?.lat);
   const lon = Number(data?.lon);
   const elev = data?.elev_m != null && data.elev_m !== '' ? Number(data.elev_m) : null;
-  if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
-  await wps.create({ name, lat, lon, elev_m: elev });
-  await wps.refreshAll();
+  if (!name || !isValidLat(lat) || !isValidLon(lon)) {
+    actions.show('Enter a valid name, lat (-90..90), and lon (-180..180)', { kind: 'error', placement: 'banner-top' });
+    return false; // keep alert open
+  }
+  // Fire async creation and allow alert to close immediately
+  (async () => {
+    await wps.create({ name, lat, lon, elev_m: elev });
+    await wps.refreshAll();
+  })();
+  return true;
 }
 
 // Rename

@@ -14,6 +14,12 @@ export class WaypointsRepo {
   }
 
   async create(input: { name: string; lat: number; lon: number; elev_m?: number | null }): Promise<number> {
+    // Defensive validation for coordinate ranges
+    const validLat = Number.isFinite(input.lat) && input.lat >= -90 && input.lat <= 90;
+    const validLon = Number.isFinite(input.lon) && input.lon >= -180 && input.lon <= 180;
+    if (!validLat || !validLon) {
+      throw new Error('Invalid coordinates: latitude must be in [-90, 90], longitude in [-180, 180]');
+    }
     await this.db
       .insertInto('waypoint')
       .values({

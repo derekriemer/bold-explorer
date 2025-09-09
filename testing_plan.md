@@ -46,6 +46,15 @@ Guidance for contributors/agents:
 - [ ] `tests/unit/data/collections.repo.spec.ts`
   - [ ] add/remove waypoint and trail; contents() reflects state and order
 
+### Running DB-backed unit tests
+
+- Some repository tests require an in-memory SQLite database.
+- In constrained sandboxes, native `better-sqlite3` may be unavailable; those tests are skipped by default.
+- To enable them locally, run with `DB_NATIVE=1`:
+  - Example: `DB_NATIVE=1 pnpm test:unit --run`
+- A reusable fixture is provided at `tests/unit/fixtures/test-db.ts` which creates a fresh `:memory:` DB in `beforeEach` and destroys it in `afterEach` for isolation.
+- If you prefer a pure web approach, we can switch fixtures to use jeep-sqlite with `sql.js` under a jsdom environment; ask to enable this path.
+
 ## Phase 4: Lightweight Component
 
 - [ ] `tests/unit/components/PositionReadout.spec.ts`

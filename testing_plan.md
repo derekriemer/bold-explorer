@@ -16,6 +16,7 @@ Guidance for contributors/agents:
   - [x] haversineDistanceMeters: symmetry A→B = B→A
   - [x] initialBearingDeg: cardinal/quadrant cases, wrap to [0,360)
   - [x] deltaHeadingDeg: wrap-around and sign correctness (e.g., 350→10 = -20; 10→350 = 20)
+  - [x] security: `sqlDistanceMetersForAlias` rejects unsafe alias strings
 - [x] `tests/unit/utils/locationParam.spec.ts`
   - [x] parseCenterParam: valid "lat,lon" parsing
   - [x] parseCenterParam: array input picks first
@@ -54,6 +55,7 @@ Guidance for contributors/agents:
   - Example: `DB_NATIVE=1 pnpm test:unit --run`
 - A reusable fixture is provided at `tests/unit/fixtures/test-db.ts` which creates a fresh `:memory:` DB in `beforeEach` and destroys it in `afterEach` for isolation.
 - If you prefer a pure web approach, we can switch fixtures to use jeep-sqlite with `sql.js` under a jsdom environment; ask to enable this path.
+ - Performance note: Native `better-sqlite3` runs faster than the web (jeep-sqlite + sql.js) path. For performance-sensitive tests, consider running the native variant (may require elevated permissions to install native bindings in some environments). An example native spec is provided at `tests/unit/waypoints.repo.native.spec.ts`.
 
 ## Phase 4: Lightweight Component
 

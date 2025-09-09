@@ -2,6 +2,7 @@ import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
 import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance } from '@/utils/geo';
+import type { LatLng } from '@/types/latlng';
 
 const RAD = 0.017453292519943295;
 
@@ -19,7 +20,7 @@ export class WaypointsRepo {
     if (!validLat || !validLon) {
       throw new Error('Invalid coordinates: latitude must be in [-90, 90], longitude in [-180, 180]');
     }
-    await this.db
+    const res = await this.db
       .insertInto('waypoint')
       .values({
         name: input.name,
@@ -28,12 +29,9 @@ export class WaypointsRepo {
         elev_m: input.elev_m ?? null,
         created_at: new Date().toISOString()
       })
-      .execute();
-    const rows = await sql<{ id: number }>`select last_insert_rowid() as id`.execute(this.db as any);
-    // Kysely RawBuilder.execute returns an array of rows on SELECT
-    // Fall back to 0 if shape differs
-    const id = Array.isArray(rows) ? (rows[0] as any)?.id : (rows as any)?.rows?.[0]?.id;
-    return Number(id ?? 0);
+      .returning('id')
+      .executeTakeFirst();
+    return Number(res!.id);
   }
 
   async addToTrail(input: { trailId: number; name: string; lat: number; lon: number; elev_m?: number | null; position?: number }): Promise<{ waypointId: number; position: number }> {
@@ -154,7 +152,7 @@ export class WaypointsRepo {
     });
   }
 
-  async forLocation(center: { lat: number; lon: number }, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Selectable<Waypoint> & { distance_m?: number }>> {
+  async forLocation(center: LatLng, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Selectable<Waypoint> & { distance_m?: number }>> {
     const degLat = radiusM / 111320;
     const degLon = radiusM / (111320 * Math.cos(center.lat * RAD));
     const base = this.db
@@ -182,7 +180,7 @@ export class WaypointsRepo {
     return opts?.limit ? nearby.slice(0, opts.limit) : nearby;
   }
 
-  async withDistanceFrom(center: { lat: number; lon: number }, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
+  async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
     return fetchWaypointsWithDistance(this.db, center, opts);
   }
 }

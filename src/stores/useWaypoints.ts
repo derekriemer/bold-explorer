@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import type { Selectable } from 'kysely';
 import type { Waypoint } from '@/db/schema';
+import type { LatLng } from '@/types/latlng';
 
 export const useWaypoints = defineStore('waypoints', {
   state: () => ({
@@ -42,7 +43,7 @@ export const useWaypoints = defineStore('waypoints', {
     async remove(id: number) {
       await this.$repos.waypoints.remove(id);
     },
-    async withDistanceFrom(center: { lat: number; lon: number }, opts?: { trailId?: number; limit?: number }) {
+    async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }) {
       return this.$repos.waypoints.withDistanceFrom(center, opts);
     }
   }

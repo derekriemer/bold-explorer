@@ -1,11 +1,13 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
+import type { LatLng } from '@/types/latlng';
+import { assertLatLng } from '@/types/latlng';
 
 const RAD = Math.PI / 180;
 export const EARTH_R = 6371000;
 
-export function haversineDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+export function haversineDistanceMeters(a: LatLng, b: LatLng): number {
   const R = 6371000;
   const dLat = (b.lat - a.lat) * RAD;
   const dLon = (b.lon - a.lon) * RAD;
@@ -18,7 +20,7 @@ export function haversineDistanceMeters(a: { lat: number; lon: number }, b: { la
   return R * c;
 }
 
-export function initialBearingDeg(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+export function initialBearingDeg(a: LatLng, b: LatLng): number {
   const lat1 = a.lat * RAD;
   const lat2 = b.lat * RAD;
   const dLon = (b.lon - a.lon) * RAD;
@@ -35,7 +37,14 @@ export function deltaHeadingDeg(heading: number, bearing: number): number {
 
 // Kysely SQL helper: compute haversine distance in meters for a table alias
 // Example: sqlDistanceMetersForAlias('w', {lat, lon}) -> RawBuilder<number> as 'distance_m'
-export function sqlDistanceMetersForAlias(alias: string, center: { lat: number; lon: number }) {
+export function sqlDistanceMetersForAlias(alias: string, center: LatLng) {
+  // Defend against identifier injection: only allow simple SQL identifiers
+  // (letters/underscore start, then letters/digits/underscore). Callers pass
+  // a constant like 'w' in current usage.
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
+    throw new Error('Invalid SQL alias');
+  }
+  assertLatLng(center);
   const latRef = sql.ref(`${alias}.lat`);
   const lonRef = sql.ref(`${alias}.lon`);
   return sql<number>`
@@ -52,7 +61,7 @@ export function sqlDistanceMetersForAlias(alias: string, center: { lat: number; 
 // High-level helper: fetch waypoints with computed distance from center, ordered ascending.
 export async function fetchWaypointsWithDistance(
   db: Kysely<DB>,
-  center: { lat: number; lon: number },
+  center: LatLng,
   opts?: { trailId?: number; limit?: number }
 ): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
   const distanceExpr = sqlDistanceMetersForAlias('w', center);

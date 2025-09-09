@@ -106,6 +106,7 @@ import {
 } from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { computed, onMounted, ref, watch } from 'vue';
+import type { Selectable } from 'kysely';
 import { useRoute } from 'vue-router';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
@@ -124,7 +125,7 @@ const route = useRoute();
 const actions = useActions();
 
 const query = ref('');
-type WpWithDistance = ReturnType<typeof useWaypoints> extends infer T ? T extends { withDistanceFrom: any } ? (Awaited<ReturnType<T['withDistanceFrom']>>[number]) : never : never;
+type WpWithDistance = Selectable<Waypoint> & { distance_m: number };
 const units = ref<'metric' | 'imperial'>('metric');
 const nearby = ref<WpWithDistance[] | null>(null);
 const liveUpdates = ref(false);

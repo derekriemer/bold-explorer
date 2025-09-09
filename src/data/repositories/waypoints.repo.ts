@@ -1,10 +1,9 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
-import { sqlDistanceMetersForAlias, EARTH_R, fetchWaypointsWithDistance } from '@/utils/geo';
+import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance } from '@/utils/geo';
 
 const RAD = 0.017453292519943295;
-const EARTH_R = 6371000;
 
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}

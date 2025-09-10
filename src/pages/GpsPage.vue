@@ -74,12 +74,8 @@
             <ion-label>Show Debug</ion-label>
             <ion-toggle v-model=" debugOpen " aria-label="Toggle diagnostics panel"></ion-toggle>
           </ion-item>
-          <ion-item lines="none">
-            <ion-label>Heading</ion-label>
-            <ion-segment v-model=" compassMode " aria-label="Heading source">
-              <ion-segment-button value="magnetic"><ion-label>Magnetic</ion-label></ion-segment-button>
-              <ion-segment-button value="true"><ion-label>True</ion-label></ion-segment-button>
-            </ion-segment>
+          <ion-item lines="none" :button="true" :detail="false" @click=" toggleCompassMode ">
+            <ion-label>Heading ({{ compassMode === 'true' ? 'True' : 'Magnetic' }})</ion-label>
           </ion-item>
           <ion-button fill="outline" size="small" @click=" runDiagnostics " aria-label="Run diagnostics">Run
             Diagnostics</ion-button>
@@ -99,10 +95,10 @@
               <div><span class="k">Waypoints(all):</span> <span class="v">{{ waypointsAll.length }}</span></div>
               <div v-if="selectedTrailId"><span class="k">Waypoints(trail):</span> <span class="v">{{
                 (wps.byTrail[selectedTrailId] ?? []).length }}</span></div>
-              <div><span class="k">Compass abs:</span> <span class="v">{{ orientationAbs === true ? 'true' : orientationAbs === false ? 'false' : '—' }}</span></div>
-              <div><span class="k">alpha:</span> <span class="v">{{ alpha != null ? alpha.toFixed(1) : '—' }}</span></div>
-              <div><span class="k">beta:</span> <span class="v">{{ beta != null ? beta.toFixed(1) : '—' }}</span></div>
-              <div><span class="k">gamma:</span> <span class="v">{{ gamma != null ? gamma.toFixed(1) : '—' }}</span></div>
+              <div><span class="k">Compass mag:</span> <span class="v">{{ headingMag != null ? `${ (headingMag).toFixed(0) }°` : '—' }}</span></div>
+              <div><span class="k">Compass true:</span> <span class="v">{{ headingTrue != null ? `${ (headingTrue).toFixed(0) }°` : '—' }}</span></div>
+              <div><span class="k">Declination:</span> <span class="v">{{ declinationText }}</span></div>
+              
               <div><span class="k">Repos installed:</span> <span class="v">{{ diag?.repos ?? '—' }}</span></div>
               <div><span class="k">Query OK:</span> <span class="v">{{ diag?.queryOk ?? '—' }}</span></div>
               <div><span class="k">Create OK:</span> <span class="v">{{ diag?.createOk ?? '—' }}</span></div>
@@ -131,7 +127,6 @@ import { Capacitor } from '@capacitor/core';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useGeolocation } from '@/composables/useGeolocation';
-import { Motion } from '@capacitor/motion';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
 import { getUnits, getCompassMode, setCompassMode } from '@/data/storage/prefs/preferences.service';
@@ -163,15 +158,10 @@ const actions = useActions();
 const debugOpen = ref(false);
 const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
 const isWeb = Capacitor.getPlatform() === 'web';
-// Local heading + orientation debug state (replacing useCompass)
+// Compass plugin state
 const headingMag = ref<number | null>(null);
 const headingTrue = ref<number | null>(null);
-const orientationAbs = ref<boolean | undefined>(undefined);
-const alpha = ref<number | null>(null);
-const beta = ref<number | null>(null);
-const gamma = ref<number | null>(null);
 let removeHeadingListener: (() => void) | null = null;
-let removeMotionListener: (() => void) | null = null;
 
 const targetCoord = computed(() =>
 {
@@ -204,6 +194,14 @@ const compassHeadingDeg = computed(() =>
   if (compassMode.value === 'true') return headingTrue.value ?? headingMag.value;
   return headingMag.value ?? headingTrue.value;
 });
+// Magnetic declination (true - magnetic), normalized to [-180, 180]
+const declinationDeg = computed(() => {
+  if (headingMag.value == null || headingTrue.value == null) return null;
+  let d = headingTrue.value - headingMag.value;
+  d = ((d + 180) % 360 + 360) % 360 - 180;
+  return d;
+});
+const declinationText = computed(() => declinationDeg.value != null ? `${ declinationDeg.value.toFixed(1) }°` : '—');
 const targetName = computed(() =>
 {
   if (scope.value === 'waypoint')
@@ -258,6 +256,11 @@ async function recenter ()
 function clearWaypoint ()
 {
   selectedWaypointId.value = null;
+}
+
+function toggleCompassMode ()
+{
+  compassMode.value = compassMode.value === 'true' ? 'magnetic' : 'true';
 }
 
 // Audio cues toggle moved to Settings page
@@ -342,28 +345,23 @@ onMounted(async () =>
   {
     try
     {
+      console.info('[Heading] init: platform', Capacitor.getPlatform());
+      console.info('[Heading] has start:', typeof (Heading as any)?.start);
       const sub = await Heading.addListener('heading', (evt) =>
       {
         const mag = typeof (evt as any)?.magnetic === 'number' ? (evt as any).magnetic : null;
         const tru = typeof (evt as any)?.true === 'number' ? (evt as any).true : null;
         headingMag.value = mag;
         headingTrue.value = tru;
-        orientationAbs.value = true;
+        
       });
+      console.info('[Heading] addListener attached; calling start');
       await Heading.start({ useTrueNorth: true });
+      console.info('[Heading] start called');
       removeHeadingListener = () => { sub.remove(); void Heading.stop(); };
-    } catch {}
-    try
-    {
-      const sub2 = await Motion.addListener('orientation', (event: any) =>
-      {
-        alpha.value = typeof event?.alpha === 'number' ? event.alpha : null;
-        beta.value = typeof event?.beta === 'number' ? event.beta : null;
-        gamma.value = typeof event?.gamma === 'number' ? event.gamma : null;
-        orientationAbs.value = event?.absolute;
-      });
-      removeMotionListener = () => { sub2.remove(); };
-    } catch {}
+    } catch (e) {
+      console.error('[Heading] init error', e);
+    }
   }
 });
 
@@ -380,10 +378,9 @@ autoStartOnMounted({
 onBeforeUnmount(() =>
 {
   try { removeHeadingListener?.(); } catch {}
-  try { removeMotionListener?.(); } catch {}
-  removeHeadingListener = null; removeMotionListener = null;
+  removeHeadingListener = null;
 });
-
+  
 watch(compassMode, async (m) => { try { await setCompassMode(m); } catch {} });
 
 watch(selectedTrailId, async (id) =>
@@ -397,6 +394,7 @@ watch(gps, async (pos) =>
   if (!pos) return;
   if (isWeb) return;
   try {
+    console.info('[Heading] setLocation ->', pos.lat, pos.lon, pos.altitude ?? undefined);
     await Heading.setLocation?.({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
   } catch { /* ignore */ }
 });

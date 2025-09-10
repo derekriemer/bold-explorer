@@ -8,7 +8,7 @@
         <ion-title>Settings</ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content>
+  <ion-content>
       <ion-list inset>
         <ion-item>
           <ion-label>Units</ion-label>
@@ -26,6 +26,11 @@
           <ion-label>Audio Cues</ion-label>
           <ion-toggle v-model="audioCues" @ionChange="onAudioToggle" aria-label="Toggle audio cues"/>
         </ion-item>
+
+        <ion-item lines="full">
+          <ion-label>Use True North</ion-label>
+          <ion-toggle :checked="compassMode === 'true'" @ionChange="onCompassToggle" aria-label="Toggle heading reference" />
+        </ion-item>
       </ion-list>
     </ion-content>
   </ion-page>
@@ -37,10 +42,11 @@ import {
   IonButtons, IonBackButton
 } from '@ionic/vue';
 import { ref, onMounted } from 'vue';
-import { getUnits, setUnits, getAudioCuesEnabled, setAudioCuesEnabled } from '@/data/storage/prefs/preferences.service';
+import { getUnits, setUnits, getAudioCuesEnabled, setAudioCuesEnabled, getCompassMode, setCompassMode } from '@/data/storage/prefs/preferences.service';
 
 const units = ref<'metric' | 'imperial'>('metric');
 const audioCues = ref(false);
+const compassMode = ref<'magnetic' | 'true'>('magnetic');
 
 async function onUnitsChange() {
   await setUnits(units.value);
@@ -50,8 +56,15 @@ async function onAudioToggle() {
   await setAudioCuesEnabled(audioCues.value);
 }
 
+async function onCompassToggle(ev: CustomEvent) {
+  const checked = (ev as any).detail?.checked === true;
+  compassMode.value = checked ? 'true' : 'magnetic';
+  await setCompassMode(compassMode.value);
+}
+
 onMounted(async () => {
   units.value = await getUnits();
   audioCues.value = await getAudioCuesEnabled();
+  compassMode.value = await getCompassMode();
 });
 </script>

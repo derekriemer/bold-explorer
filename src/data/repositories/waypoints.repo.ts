@@ -1,7 +1,7 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
-import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance } from '@/utils/geo';
+import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance, haversineDistanceMeters } from '@/utils/geo';
 import type { LatLng } from '@/types/latlng';
 
 const RAD = 0.017453292519943295;
@@ -181,6 +181,40 @@ export class WaypointsRepo {
   }
 
   async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
-    return fetchWaypointsWithDistance(this.db, center, opts);
+    // Bounding box in degrees for ~50km radius (adjustable if needed)
+    const radiusM = 50000;
+    const degLat = radiusM / 111320;
+    const degLon = radiusM / (111320 * Math.cos(center.lat * RAD));
+
+    // Candidate limit: fetch a bit more than requested to refine by exact haversine
+    const candidateLimit = opts?.limit ? Math.max(opts.limit * 3, opts.limit + 25) : undefined;
+
+    const base = this.db
+      .selectFrom('waypoint as w')
+      .$if(!!opts?.trailId, (qb: any) =>
+        qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
+      )
+      .where('w.lat', '>=', center.lat - degLat)
+      .where('w.lat', '<=', center.lat + degLat)
+      .where('w.lon', '>=', center.lon - degLon)
+      .where('w.lon', '<=', center.lon + degLon);
+
+    // Coarse sort by component-wise closeness so JS sort does less work
+    const absLat = sql`abs(w.lat - ${center.lat})`;
+    const absLon = sql`abs(w.lon - ${center.lon})`;
+
+    const rows = await base
+      .select(['w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
+      .orderBy(absLat)
+      .orderBy(absLon)
+      .$if(!!candidateLimit, (qb: any) => qb.limit(candidateLimit!))
+      .execute();
+
+    const mapped = (rows as any[]).map((w) => ({
+      ...w,
+      distance_m: haversineDistanceMeters(center, { lat: w.lat, lon: w.lon })
+    })) as Array<Selectable<Waypoint> & { distance_m: number }>;
+    mapped.sort((a, b) => a.distance_m - b.distance_m);
+    return opts?.limit ? mapped.slice(0, opts.limit) : mapped;
   }
 }

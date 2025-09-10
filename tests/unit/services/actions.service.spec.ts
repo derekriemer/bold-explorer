@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { ActionService } from '@/services/actions.service';
 
 describe('ActionService', () => {
-  it('show: defaults, durable vs timed (durationMs null)', () => {
+  it('show: defaults auto-dismiss per kind, explicit null keeps durable', () => {
     const svc = new ActionService();
     const id1 = svc.show('Hello');
     const list1 = svc.actions;
@@ -12,7 +12,7 @@ describe('ActionService', () => {
     expect(a1.message).toBe('Hello');
     expect(a1.kind).toBe('info');
     expect(a1.placement).toBe('bottom');
-    expect(a1.durationMs).toBeNull();
+    expect(a1.durationMs).toBe(5000);
     expect(a1.dismissLabel).toBe('Dismiss');
     expect(a1.undoLabel).toBe('Undo');
     expect(a1.canUndo).toBe(false);
@@ -21,6 +21,10 @@ describe('ActionService', () => {
     const list2 = svc.actions;
     const a2 = list2.find(a => a.id === id2)!;
     expect(a2.durationMs).toBe(3000);
+
+    const id3 = svc.show('Durable', { durationMs: null });
+    const a3 = svc.actions.find(a => a.id === id3)!;
+    expect(a3.durationMs).toBeNull();
   });
 
   it('dismiss: removes and calls onDismiss', async () => {

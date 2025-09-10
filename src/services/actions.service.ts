@@ -7,6 +7,7 @@ export interface ActionOptions {
   kind?: ActionKind;
   placement?: ActionPlacement;
   durationMs?: number | null; // null or undefined = durable
+  canAutoDismiss?: boolean; // when durationMs is undefined, auto-timeout per kind if true (default true)
   dismissLabel?: string;
   undoLabel?: string;
   canUndo?: boolean;
@@ -39,12 +40,27 @@ export class ActionService {
 
   show(message: string, opts: ActionOptions = {}): number {
     const id = this.seq++;
+    // Determine auto-dismiss duration
+    const kind = opts.kind ?? 'info';
+    const auto = opts.canAutoDismiss ?? true;
+    const computedDuration = (() => {
+      if (opts.durationMs !== undefined) return opts.durationMs; // explicit (including null)
+      if (!auto) return null;
+      switch (kind) {
+        case 'warning': return 10000; // 10s
+        case 'error': return 20000;   // 20s
+        case 'success':
+        case 'info':
+        default: return 5000;        // 5s
+      }
+    })();
+
     const item: ActionItem = {
       id,
       message,
-      kind: opts.kind ?? 'info',
+      kind,
       placement: opts.placement ?? 'bottom',
-      durationMs: opts.durationMs ?? null,
+      durationMs: computedDuration ?? null,
       dismissLabel: opts.dismissLabel ?? 'Dismiss',
       undoLabel: opts.undoLabel ?? 'Undo',
       canUndo: !!opts.canUndo || !!opts.onUndo,

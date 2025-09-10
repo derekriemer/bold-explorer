@@ -41,30 +41,34 @@ import {
   IonList, IonItem, IonLabel, IonToggle, IonSegment, IonSegmentButton,
   IonButtons, IonBackButton
 } from '@ionic/vue';
-import { ref, onMounted } from 'vue';
-import { getUnits, setUnits, getAudioCuesEnabled, setAudioCuesEnabled, getCompassMode, setCompassMode } from '@/data/storage/prefs/preferences.service';
+import { computed } from 'vue';
+import { usePrefsStore } from '@/stores/usePrefs';
 
-const units = ref<'metric' | 'imperial'>('metric');
-const audioCues = ref(false);
-const compassMode = ref<'magnetic' | 'true'>('magnetic');
+const prefs = usePrefsStore();
+
+const units = computed({
+  get: () => prefs.units,
+  set: (v: 'metric' | 'imperial') => { void prefs.setUnits(v); }
+});
+const audioCues = computed({
+  get: () => prefs.audioCuesEnabled,
+  set: (v: boolean) => { void prefs.setAudioCuesEnabled(v); }
+});
+const compassMode = computed({
+  get: () => prefs.compassMode,
+  set: (v: 'magnetic' | 'true') => { void prefs.setCompassMode(v); }
+});
 
 async function onUnitsChange() {
-  await setUnits(units.value);
+  // v-model already triggers setter; keep handler for clarity
 }
 
 async function onAudioToggle() {
-  await setAudioCuesEnabled(audioCues.value);
+  // v-model setter handles persistence
 }
 
 async function onCompassToggle(ev: CustomEvent) {
   const checked = (ev as any).detail?.checked === true;
   compassMode.value = checked ? 'true' : 'magnetic';
-  await setCompassMode(compassMode.value);
 }
-
-onMounted(async () => {
-  units.value = await getUnits();
-  audioCues.value = await getAudioCuesEnabled();
-  compassMode.value = await getCompassMode();
-});
 </script>

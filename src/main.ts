@@ -4,6 +4,7 @@ import App from './App.vue';
 import router from './router';
 import { IonicVue } from '@ionic/vue';
 import { createPinia } from 'pinia';
+import { usePrefsStore } from '@/stores/usePrefs';
 import { installRepositories } from './plugins/repositories';
 import { installActions } from './plugins/actions';
 
@@ -58,6 +59,9 @@ async function bootstrap() {
   }
   const pinia = createPinia();
   await installRepositories(pinia);
+  // Hydrate preferences (with migrations) so pages react to ready values
+  const prefs = usePrefsStore(pinia);
+  await prefs.hydrate();
 
   const app = createApp(App)
     .use(IonicVue)

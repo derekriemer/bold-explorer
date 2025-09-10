@@ -29,7 +29,8 @@
               <p>
                 {{ wp.lat.toFixed(5) }}, {{ wp.lon.toFixed(5) }}
                 <span v-if="wp.elev_m != null"> · {{ wp.elev_m }} m</span>
-                <span v-if="(wp as any).distance_m != null"> · {{ formatDistance((wp as any).distance_m, units) }}</span>
+                <span v-if="(wp as any).distance_m != null"> · {{ formatDistance((wp as any).distance_m, units)
+                  }}</span>
               </p>
             </ion-label>
             <ion-buttons slot="end">
@@ -81,12 +82,12 @@
 </template>
 <script setup lang="ts">
 import
-  {
-    IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-    IonButtons, IonButton, IonSearchbar, IonList, IonItem, IonLabel,
-    IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonToggle,
-    onIonViewWillEnter
-  } from '@ionic/vue';
+{
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
+  IonButtons, IonButton, IonSearchbar, IonList, IonItem, IonLabel,
+  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonToggle,
+  onIonViewWillEnter
+} from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import type { Selectable } from 'kysely';
@@ -95,7 +96,7 @@ import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
 import { useGeolocation } from '@/composables/useGeolocation';
 import { formatDistance as fmtDistance } from '@/composables/useDistance';
-import { getUnits } from '@/data/storage/prefs/preferences.service';
+import { usePrefsStore } from '@/stores/usePrefs';
 import { parseCenterParam } from '@/utils/locationParam';
 import { Geolocation } from '@capacitor/geolocation';
 import { useActions } from '@/composables/useActions';
@@ -110,7 +111,8 @@ const actions = useActions();
 
 const query = ref('');
 type WpWithDistance = Selectable<Waypoint> & { distance_m: number };
-const units = ref<'metric' | 'imperial'>('metric');
+const prefs = usePrefsStore();
+const units = computed(() => prefs.units);
 const nearby = ref<WpWithDistance[] | null>(null);
 const liveUpdates = ref(false);
 
@@ -137,8 +139,8 @@ async function onToggleLive ()
   {
     const ok = await ensurePermissions();
     if (!ok) { liveUpdates.value = false; return; }
-    await start({ enableHighAccuracy: true });
-    await recenter({ enableHighAccuracy: true });
+    await start();
+    await recenter();
     await refreshByDistance();
   } else
   {
@@ -278,7 +280,6 @@ function onExport () { showTodo('Export — will implement later'); }
 onMounted(async () =>
 {
   await Promise.all([wps.refreshAll(), trails.refresh()]);
-  units.value = await getUnits();
   // If a center is explicitly provided, pre-sort using it once during initial mount.
   const center = getCenterFromRoute();
   if (center)

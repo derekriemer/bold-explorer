@@ -20,11 +20,13 @@
       <div class="ion-padding">
         <ion-item v-if="scope === 'waypoint'">
           <ion-label>Waypoint</ion-label>
-          <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected" aria-label="Select waypoint">
+          <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected"
+            aria-label="Select waypoint">
             <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
-              }}</ion-select-option>
+            }}</ion-select-option>
           </ion-select>
-          <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null" @click=" clearWaypoint " aria-label="Clear selected waypoint">Clear</ion-button>
+          <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null" @click=" clearWaypoint "
+            aria-label="Clear selected waypoint">Clear</ion-button>
         </ion-item>
 
         <template v-else>
@@ -70,43 +72,15 @@
 
         <div class="controls">
           <ion-button @click=" recenter " aria-label="Recenter or calibrate">Recenter/Calibrate</ion-button>
-          <ion-item lines="none">
-            <ion-label>Show Debug</ion-label>
-            <ion-toggle v-model=" debugOpen " aria-label="Toggle diagnostics panel"></ion-toggle>
+          <ion-item lines="none" :button=" true " :detail=" false " @click=" toggleCompassMode ">
+            <ion-label>Compass heading: {{ compassMode === 'true' ? 'True' : 'Magnetic' }}</ion-label>
           </ion-item>
-          <ion-item lines="none" :button="true" :detail="false" @click=" toggleCompassMode ">
-            <ion-label>Heading ({{ compassMode === 'true' ? 'True' : 'Magnetic' }})</ion-label>
-          </ion-item>
-          <ion-button fill="outline" size="small" @click=" runDiagnostics " aria-label="Run diagnostics">Run
-            Diagnostics</ion-button>
+
         </div>
 
         <div class="sr-only" aria-live="polite">{{ announcement }}</div>
 
-        <ion-card v-if="debugOpen">
-          <ion-card-content>
-            <div class="debug-grid">
-              <div><span class="k">GPS:</span> <span class="v">{{ gps ? `${ gps.lat.toFixed(5) }, ${ gps.lon.toFixed(5)
-                }` :
-                'none'
-                  }}</span></div>
-              <div><span class="k">Scope:</span> <span class="v">{{ scope }}</span></div>
-              <div><span class="k">TrailId:</span> <span class="v">{{ selectedTrailId ?? '-' }}</span></div>
-              <div><span class="k">Waypoints(all):</span> <span class="v">{{ waypointsAll.length }}</span></div>
-              <div v-if="selectedTrailId"><span class="k">Waypoints(trail):</span> <span class="v">{{
-                (wps.byTrail[selectedTrailId] ?? []).length }}</span></div>
-              <div><span class="k">Compass mag:</span> <span class="v">{{ headingMag != null ? `${ (headingMag).toFixed(0) }°` : '—' }}</span></div>
-              <div><span class="k">Compass true:</span> <span class="v">{{ headingTrue != null ? `${ (headingTrue).toFixed(0) }°` : '—' }}</span></div>
-              <div><span class="k">Declination:</span> <span class="v">{{ declinationText }}</span></div>
-              
-              <div><span class="k">Repos installed:</span> <span class="v">{{ diag?.repos ?? '—' }}</span></div>
-              <div><span class="k">Query OK:</span> <span class="v">{{ diag?.queryOk ?? '—' }}</span></div>
-              <div><span class="k">Create OK:</span> <span class="v">{{ diag?.createOk ?? '—' }}</span></div>
-              <div><span class="k">Delete OK:</span> <span class="v">{{ diag?.deleteOk ?? '—' }}</span></div>
-              <div v-if="diag?.error"><span class="k">Error:</span> <span class="v err">{{ diag?.error }}</span></div>
-            </div>
-          </ion-card-content>
-        </ion-card>
+
       </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
@@ -120,7 +94,7 @@ import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonSegment, IonSegmentButton, IonLabel, IonItem, IonSelect, IonSelectOption,
-  IonCard, IonCardContent, IonButton, IonToggle, IonFab, IonFabButton
+  IonCard, IonCardContent, IonButton, IonFab, IonFabButton
 } from '@ionic/vue';
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Capacitor } from '@capacitor/core';
@@ -129,7 +103,7 @@ import { useWaypoints } from '@/stores/useWaypoints';
 import { useGeolocation } from '@/composables/useGeolocation';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
-import { getUnits, getCompassMode, setCompassMode } from '@/data/storage/prefs/preferences.service';
+import { usePrefsStore } from '@/stores/usePrefs';
 import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
@@ -151,12 +125,12 @@ const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[sele
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
   useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
 
-const units = ref<'metric' | 'imperial'>('metric');
-const compassMode = ref<'magnetic' | 'true'>('magnetic');
+const prefs = usePrefsStore();
+const units = computed(() => prefs.units);
+const compassMode = computed(() => prefs.compassMode);
 // Audio cues moved to Settings page
 const actions = useActions();
-const debugOpen = ref(false);
-const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
+
 const isWeb = Capacitor.getPlatform() === 'web';
 // Compass plugin state
 const headingMag = ref<number | null>(null);
@@ -195,7 +169,8 @@ const compassHeadingDeg = computed(() =>
   return headingMag.value ?? headingTrue.value;
 });
 // Magnetic declination (true - magnetic), normalized to [-180, 180]
-const declinationDeg = computed(() => {
+const declinationDeg = computed(() =>
+{
   if (headingMag.value == null || headingTrue.value == null) return null;
   let d = headingTrue.value - headingMag.value;
   d = ((d + 180) % 360 + 360) % 360 - 180;
@@ -258,9 +233,10 @@ function clearWaypoint ()
   selectedWaypointId.value = null;
 }
 
-function toggleCompassMode ()
+async function toggleCompassMode ()
 {
-  compassMode.value = compassMode.value === 'true' ? 'magnetic' : 'true';
+  const next = compassMode.value === 'true' ? 'magnetic' : 'true';
+  await prefs.setCompassMode(next);
 }
 
 // Audio cues toggle moved to Settings page
@@ -294,53 +270,12 @@ async function markWaypoint ()
   }
 }
 
-async function runDiagnostics ()
-{
-  const out: any = {};
-  try
-  {
-    out.repos = !!wps?.$repos?.waypoints && typeof wps.$repos.waypoints.all === 'function';
-    if (!out.repos) throw new Error('Pinia repos not installed');
-    const list = await wps.$repos.waypoints.all();
-    out.count = list.length;
-    out.queryOk = true;
-  } catch (e: any)
-  {
-    out.error = `Query failed: ${ e?.message ?? String(e) }`;
-    diag.value = out;
-    actions.show(out.error, { kind: 'error', placement: 'banner-top', durationMs: null });
-    return;
-  }
-  // Try create/delete a temp waypoint to test write path
-  let tempId: number | null = null;
-  try
-  {
-    tempId = await wps.$repos.waypoints.create({ name: `diag-${ Date.now() }`, lat: 0, lon: 0, elev_m: null } as any);
-    out.createOk = Number.isFinite(tempId);
-  } catch (e: any)
-  {
-    out.error = `Create failed: ${ e?.message ?? String(e) }`;
-    diag.value = out;
-    actions.show(out.error, { kind: 'error', placement: 'banner-top', durationMs: null });
-    return;
-  }
-  try
-  {
-    if (tempId != null) await wps.$repos.waypoints.remove(tempId);
-    out.deleteOk = true;
-  } catch (e: any)
-  {
-    out.error = `Delete failed: ${ e?.message ?? String(e) }`;
-  }
-  diag.value = out;
-  actions.show('Diagnostics completed', { kind: out.error ? 'warning' : 'success' });
-}
+
 
 onMounted(async () =>
 {
   await Promise.all([trails.refresh(), wps.refreshAll()]);
-  units.value = await getUnits();
-  compassMode.value = await getCompassMode();
+  // prefs store is hydrated on app startup; values are reactive
   if (!isWeb)
   {
     try
@@ -353,13 +288,14 @@ onMounted(async () =>
         const tru = typeof (evt as any)?.true === 'number' ? (evt as any).true : null;
         headingMag.value = mag;
         headingTrue.value = tru;
-        
+
       });
       console.info('[Heading] addListener attached; calling start');
       await Heading.start({ useTrueNorth: true });
       console.info('[Heading] start called');
       removeHeadingListener = () => { sub.remove(); void Heading.stop(); };
-    } catch (e) {
+    } catch (e)
+    {
       console.error('[Heading] init error', e);
     }
   }
@@ -377,11 +313,11 @@ autoStartOnMounted({
 
 onBeforeUnmount(() =>
 {
-  try { removeHeadingListener?.(); } catch {}
+  try { removeHeadingListener?.(); } catch { }
   removeHeadingListener = null;
 });
-  
-watch(compassMode, async (m) => { try { await setCompassMode(m); } catch {} });
+
+// compassMode persists via prefs store actions
 
 watch(selectedTrailId, async (id) =>
 {
@@ -393,7 +329,8 @@ watch(gps, async (pos) =>
 {
   if (!pos) return;
   if (isWeb) return;
-  try {
+  try
+  {
     console.info('[Heading] setLocation ->', pos.lat, pos.lon, pos.altitude ?? undefined);
     await Heading.setLocation?.({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
   } catch { /* ignore */ }
@@ -424,22 +361,7 @@ watch(gps, async (pos) =>
   margin-top: 8px;
 }
 
-.debug-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  font-size: 12px;
-}
 
-.debug-grid .k {
-  color: var(--ion-color-medium);
-  margin-right: 6px;
-}
-
-.debug-grid .v.err {
-  color: var(--ion-color-danger);
-}
 
 .sr-only {
   position: absolute;

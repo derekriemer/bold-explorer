@@ -22,32 +22,30 @@
     </ion-header>
     <ion-content>
       <ion-list>
-        <ion-item-sliding v-for="wp in filtered" :key=" wp.id ">
-          <ion-item>
+        <div v-for="wp in filtered" :key=" wp.id ">
+          <ion-item button :detail=" true " @click=" toggleExpand(wp.id as number) "
+            :aria-expanded=" expandedId === (wp.id as number) ? 'true' : 'false' "
+          >
             <ion-label>
               <h2>{{ wp.name }}</h2>
               <p>
-                {{ wp.lat.toFixed(5) }}, {{ wp.lon.toFixed(5) }}
-                <span v-if="wp.elev_m != null"> · {{ wp.elev_m }} m</span>
-                <span v-if="(wp as any).distance_m != null"> · {{ formatDistance((wp as any).distance_m, units)
-                  }}</span>
+                <span v-if="(wp as any).distance_m != null">{{ formatDistance((wp as any).distance_m, units) }}</span>
+                <span v-else>—</span>
               </p>
             </ion-label>
-            <ion-buttons slot="end">
-              <ion-button size="small" fill="clear" color="medium" @click.stop="onRename(wp.id as number, wp.name)">
-                Edit
-              </ion-button>
-              <ion-button size="small" fill="clear" color="danger" @click.stop="onDelete(wp.id as number)">
-                Delete
-              </ion-button>
-            </ion-buttons>
           </ion-item>
-          <ion-item-options side="end">
-            <ion-item-option color="medium" @click="onAttach(wp.id as number)">Attach</ion-item-option>
-            <ion-item-option color="tertiary" @click="onRename(wp.id as number, wp.name)">Rename</ion-item-option>
-            <ion-item-option color="danger" @click="onDelete(wp.id as number)">Delete</ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
+          <div class="wp-details" v-if=" expandedId === (wp.id as number) " :id=" `wpd-${ wp.id }` ">
+            <div class="row"><span class="k">Latitude:</span> <span class="v">{{ wp.lat.toFixed(5) }}</span></div>
+            <div class="row"><span class="k">Longitude:</span> <span class="v">{{ wp.lon.toFixed(5) }}</span></div>
+            <div class="row" v-if="wp.elev_m != null"><span class="k">Elevation:</span> <span class="v">{{ wp.elev_m }} m</span></div>
+            <div class="row" v-if="wp.description"><span class="k">Description:</span> <span class="v">{{ wp.description }}</span></div>
+            <div class="actions">
+              <ion-button size="small" fill="outline" @click=" onAttach(wp.id as number) ">Attach</ion-button>
+              <ion-button size="small" fill="outline" @click=" onRename(wp.id as number, wp.name) ">Rename</ion-button>
+              <ion-button size="small" color="danger" fill="clear" @click=" onDelete(wp.id as number) ">Delete</ion-button>
+            </div>
+          </div>
+        </div>
       </ion-list>
 
       <ion-toast :is-open=" toastOpen " :message=" toastMessage " :duration=" 1800 " @didDismiss="toastOpen = false" />
@@ -80,7 +78,7 @@ import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonSearchbar, IonList, IonItem, IonLabel,
-  IonItemSliding, IonItemOptions, IonItemOption, IonToast, IonAlert, IonToggle,
+  IonToast, IonAlert, IonToggle,
   onIonViewWillEnter
 } from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
@@ -109,8 +107,14 @@ const prefs = usePrefsStore();
 const units = computed(() => prefs.units);
 const nearby = ref<WpWithDistance[] | null>(null);
 const liveUpdates = ref(false);
+const expandedId = ref<number | null>(null);
 
 const formatDistance = (d: number, u: 'metric' | 'imperial') => fmtDistance(d, u);
+
+function toggleExpand(id: number)
+{
+  expandedId.value = expandedId.value === id ? null : id;
+}
 
 const baseList = computed(() => nearby.value ?? wps.all);
 const filtered = computed(() =>
@@ -315,4 +319,13 @@ p {
   color: var(--ion-color-medium);
   font-size: 0.9rem;
 }
+
+.wp-details {
+  padding: 6px 16px 12px 16px;
+  font-size: 0.9rem;
+}
+.wp-details .row { margin: 2px 0; }
+.wp-details .k { color: var(--ion-color-medium); margin-right: 6px; }
+.wp-details .v { color: var(--ion-color-dark, #222); }
+.wp-details .actions { margin-top: 8px; display: flex; gap: 8px; }
 </style>

@@ -6,7 +6,7 @@ Guidance for contributors/agents:
 
 - Keep this list up-to-date. If scope changes, edit items instead of adding redundant ones.
 - Check boxes once tests are implemented and passing locally.
-- Target pure logic first, then mocked plugins, then UI as feasible.
+  4- Target pure logic first, then mocked plugins, then UI as feasible.
 
 ## Phase 1: Pure Logic
 
@@ -54,8 +54,7 @@ Guidance for contributors/agents:
 - To enable them locally, run with `DB_NATIVE=1`:
   - Example: `DB_NATIVE=1 pnpm test:unit --run`
 - A reusable fixture is provided at `tests/unit/fixtures/test-db.ts` which creates a fresh `:memory:` DB in `beforeEach` and destroys it in `afterEach` for isolation.
-- If you prefer a pure web approach, we can switch fixtures to use jeep-sqlite with `sql.js` under a jsdom environment; ask to enable this path.
- - Performance note: Native `better-sqlite3` runs faster than the web (jeep-sqlite + sql.js) path. For performance-sensitive tests, consider running the native variant (may require elevated permissions to install native bindings in some environments). An example native spec is provided at `tests/unit/waypoints.repo.native.spec.ts`.
+- Performance note: Native `better-sqlite3` runs faster than the web (jeep-sqlite + sql.js) path. For performance-sensitive tests, consider running the native variant (may require elevated permissions to install native bindings in some environments). An example native spec is provided at `tests/unit/waypoints.repo.native.spec.ts`.
 
 ## Phase 4: Lightweight Component
 
@@ -63,6 +62,11 @@ Guidance for contributors/agents:
   - [ ] lat/lon precision formatting
   - [ ] elevation and accuracy unit conversions
   - [ ] fallback “—” when missing data
+- [x] `tests/unit/components/MultiSelectWizard.spec.ts`
+  - [x] loads items and shows labels + sublabels
+  - [x] filters by query (case-insensitive)
+  - [x] commits selected ids and emits events
+  - [x] Select All selects only enabled items; Clear removes all
 
 ## Phase 5: Mocked Capacitor
 

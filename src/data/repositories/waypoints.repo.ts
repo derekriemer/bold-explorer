@@ -1,7 +1,7 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
-import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance, haversineDistanceMeters } from '@/utils/geo';
+import { fetchWaypointsWithDistance, sqlDistanceMetersForAlias } from '@/utils/geo';
 import type { LatLng } from '@/types/latlng';
 
 // Degrees-to-radians conversion factor (1° = PI/180 radians)
@@ -212,72 +212,6 @@ export class WaypointsRepo {
    * @returns Array of waypoints augmented with `distance_m` (meters), ordered nearest first.
    */
   async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
-    // Bounding box in degrees for ~50 km radius (adjustable if needed)
-    const radiusM = DEFAULT_BBOX_RADIUS_M;
-    const degLat = radiusM / METERS_PER_DEG_LAT;
-    const latMin = Math.max(-90, center.lat - degLat);
-    const latMax = Math.min(90, center.lat + degLat);
-
-    const cosLat = Math.cos(center.lat * DEG_TO_RAD);
-    let needsLonFilter = true;
-    let crossing = false;
-    let lonMin = -180;
-    let lonMax = 180;
-    if (Math.abs(cosLat) < EPS_COS_LAT_POLE) {
-      // Near the poles, longitude is meaningless for distance; include all longitudes
-      needsLonFilter = false;
-    } else {
-      const degLon = radiusM / (METERS_PER_DEG_LAT * cosLat);
-      if (degLon >= 180) {
-        needsLonFilter = false; // covers the globe in longitude
-      } else {
-        const lonMinRaw = center.lon - degLon;
-        const lonMaxRaw = center.lon + degLon;
-        crossing = lonMinRaw < -180 || lonMaxRaw > 180;
-        const norm = (x: number) => ((x + 180) % 360 + 360) % 360 - 180;
-        lonMin = crossing ? norm(lonMinRaw) : lonMinRaw;
-        lonMax = crossing ? norm(lonMaxRaw) : lonMaxRaw;
-      }
-    }
-
-    // Build base query with lat filter and optional lon filter, handling anti-meridian crossing
-    let base = this.db
-      .selectFrom('waypoint as w')
-      .$if(!!opts?.trailId, (qb: any) =>
-        qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
-      )
-      .where('w.lat', '>=', latMin)
-      .where('w.lat', '<=', latMax);
-
-    if (needsLonFilter) {
-      if (crossing) {
-        base = base.where(sql`(w.lon >= ${lonMin} OR w.lon <= ${lonMax})`);
-      } else {
-        base = base.where('w.lon', '>=', lonMin).where('w.lon', '<=', lonMax);
-      }
-    }
-
-    // Candidate limit: fetch a bit more than requested to refine by exact haversine
-    const candidateLimit = opts?.limit ? Math.max(opts.limit * 3, opts.limit + 25) : undefined;
-
-    // Coarse sort by component-wise closeness so JS sort does less work.
-    // For longitude, account for wrap-around at the anti-meridian.
-    const absLat = sql`abs(w.lat - ${center.lat})`;
-    const absDeltaLon = sql`abs(w.lon - ${center.lon})`;
-    const absLonCyclic = sql`CASE WHEN ${absDeltaLon} > 180 THEN 360 - ${absDeltaLon} ELSE ${absDeltaLon} END`;
-
-    const rows = await base
-      .select(['w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
-      .orderBy(absLat)
-      .orderBy(absLonCyclic)
-      .$if(!!candidateLimit, (qb: any) => qb.limit(candidateLimit!))
-      .execute();
-
-    const mapped = (rows as any[]).map((w) => ({
-      ...w,
-      distance_m: haversineDistanceMeters(center, { lat: w.lat, lon: w.lon })
-    })) as Array<Selectable<Waypoint> & { distance_m: number }>;
-    mapped.sort((a, b) => a.distance_m - b.distance_m);
-    return opts?.limit ? mapped.slice(0, opts.limit) : mapped;
+    return fetchWaypointsWithDistance(this.db, center, opts);
   }
 }

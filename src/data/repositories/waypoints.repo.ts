@@ -4,7 +4,9 @@ import type { DB, Waypoint } from '@/db/schema';
 import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance, haversineDistanceMeters } from '@/utils/geo';
 import type { LatLng } from '@/types/latlng';
 
-const RAD = 0.017453292519943295;
+// Degrees-to-radians conversion factor
+// 1 degree = PI / 180 radians
+const DEG_TO_RAD = Math.PI / 180;
 
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}
@@ -154,7 +156,7 @@ export class WaypointsRepo {
 
   async forLocation(center: LatLng, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Selectable<Waypoint> & { distance_m?: number }>> {
     const degLat = radiusM / 111320;
-    const degLon = radiusM / (111320 * Math.cos(center.lat * RAD));
+    const degLon = radiusM / (111320 * Math.cos(center.lat * DEG_TO_RAD));
     const base = this.db
       .selectFrom('waypoint as w')
       .$if(!!opts?.trailId, (qb: any) =>
@@ -187,7 +189,7 @@ export class WaypointsRepo {
     const latMin = Math.max(-90, center.lat - degLat);
     const latMax = Math.min(90, center.lat + degLat);
 
-    const cosLat = Math.cos(center.lat * RAD);
+    const cosLat = Math.cos(center.lat * DEG_TO_RAD);
     let needsLonFilter = true;
     let crossing = false;
     let lonMin = -180;

@@ -1,31 +1,57 @@
-Waypoint/Trail App — Storage‑First Design Spec (Ionic Required)
+# Waypoint/Trail App — Storage‑First Design Spec (Ionic Required)
 
-This document defines the architecture, data model, and UI for an offline‑first waypoint/trail application built with Vue 3 + Pinia + Ionic and SQLite (Capacitor) via Kysely. It is intended for contributors and code‑generating agents. Follow the structure and acceptance criteria precisely.
+This document defines the architecture, data model, and UI for an offline‑first waypoint/trail application built with Vue 3 + Pinia + Ionic and SQLite (Capacitor) via Kysely. It is intended for contributors and code‑generating agents. Keep all section headings and code fences intact when editing this spec.
 
-Tech Stack (authoritative)
+## Overview
 
-UI: Vue 3, Ionic Framework components (mandatory), Pinia
+Bold Explorer is an offline‑first trail and waypoint recorder:
 
-Database: SQLite via @capacitor-community/sqlite with Kysely dialect capacitor-sqlite-kysely
+- GPS HUD with compass (Magnetic/True), live bearing and distance, plus Follow‑Trail mode that advances to the next waypoint.
+- Quick “Record New Trail” callout on GPS page; FAB “+” records waypoints to either the trail or standalone based on scope.
+- Waypoints: nearby list (by distance), search, create/rename/delete, attach to trails.
+- Trails: create/rename/delete; manage ordered waypoints (attach existing via wizard, add new, move up/down, detach); export to GPX.
+- Collections: group waypoints and trails; bulk add via Multi‑Select Wizard; export to GPX.
+- Settings: units, compass mode, audio cues; Debug page for diagnostics.
+- Tech: Ionic Vue + Pinia; SQLite via Kysely; DI via Pinia plugin; works fully offline.
 
-Query Builder & Migrations: Kysely (bundled migrations)
+## Tech Stack (authoritative)
 
-Filesystem: @capacitor/filesystem (GPX import/export, backups)
+- UI: Ionic Framework components (mandatory), Vue 3, Pinia
+- Database: SQLite via `@capacitor-community/sqlite` with Kysely (`capacitor-sqlite-kysely` dialect)
+- Query Builder & Migrations: Kysely (bundled migrations)
+- Filesystem: `@capacitor/filesystem` (GPX import/export, backups)
+- Preferences: `@capacitor/preferences` (persisted via Pinia store)
+- Location/Sensors: `@capacitor/geolocation`; Heading compass via Capacitor plugin (see “Compass Usage”)
+- Testing: Vitest + better-sqlite3 (in-memory SQLite)
 
-Preferences: @capacitor/preferences
+## Scripts
 
-Location/Sensors: @capacitor/geolocation (and platform compass APIs as needed)
+Run from project root and use pnpm.
 
-Testing: Vitest + better-sqlite3 (in-memory SQLite)
+```
+corepack enable
+pnpm install
 
-Dependency Injection (DI) is mandatory at:
+# Dev server (copies sql.js WASM, then Vite)
+pnpm dev
 
-DB layer (app DB vs. test DB)
+# Type-check and production build
+pnpm build
 
-Repository layer (stores receive repos via provide/inject through a composable)
+# Preview production build
+pnpm preview
 
-Directory Layout (fixed)
+# Tests
+pnpm test:unit
+pnpm test:e2e
 
+# Lint
+pnpm lint
+```
+
+## Directory Layout (fixed)
+
+```
 src/
   db/
     schema.ts
@@ -39,152 +65,163 @@ src/
       auto-waypoints.repo.ts
     storage/
       gpx/gpx.service.ts     # GPX import/export via Filesystem
-      prefs/preferences.service.ts
+  components/
+    PageHeaderToolbar.vue    # Sticky header actions (Debug/Settings)
+    MultiSelectWizard.vue    # Reusable multi-select modal (attach items)
   plugins/
-    repositories.ts          # builds repos from initAppDb(), installs Pinia plugin
+    repositories.ts          # builds repos from initAppDb(); installs Pinia plugin
+    actions.ts               # provide global actions service
+    heading/                 # Capacitor Heading plugin registration
+      index.ts
   stores/
     useTrails.ts
     useWaypoints.ts
     useCollections.ts
+    usePrefs.ts              # Settings/preferences store (persists via Capacitor Preferences)
   pages/
     GpsPage.vue
     WaypointsPage.vue
     TrailsPage.vue
     CollectionsPage.vue
+    SettingsPage.vue
+    DebugPage.vue
   router/
     index.ts
   main.ts
+  types/
+    multi-select.ts          # Wizard config and item types
+```
 
 Why data/storage (not top‑level storage)
 
-All persistence concerns live under data/ (SQL repos, file I/O, preferences). This keeps data access and DI/testing patterns in one place.
+All persistence concerns live under `data/` (SQL repos and file I/O). This keeps data access and DI/testing patterns in one place.
 
-Database Schema (normalized, offline‑first)
+## Database Schema (normalized, offline‑first)
 
 Conventions
 
-Column names: snake_case
+- Column names: snake_case
+- Timestamps: ISO‑8601 strings stored as TEXT
+- Primary keys: INTEGER autoincrement
 
-Timestamps: ISO‑8601 strings stored as TEXT
+Tables (TypeScript view)
 
-Primary keys: INTEGER autoincrement
+```ts
+export interface Trail {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
 
-Tables
+export interface Waypoint {
+  id: number;
+  name: string;
+  lat: number;
+  lon: number;
+  elev_m: number | null;
+  description: string | null;
+  created_at: string;
+}
 
-trail(id INTEGER PK, name TEXT NOT NULL, description TEXT NULL, created_at TEXT NOT NULL)
+export interface TrailWaypoint {
+  id: number;
+  trail_id: number;
+  waypoint_id: number;
+  position: number;        // 1‑based within trail
+  created_at: string;
+}
 
-waypoint (id INTEGER PK, name TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, elev_m REAL NULL, description TEXT NULLm created_at TEXT NOT NULL)— elev_m = elevation in meters (nullable)
+export interface AutoWaypoint {
+  id: number;
+  trail_id: number;
+  name: string | null;
+  segment_index: number;   // 1..N-1 between ordered waypoints
+  offset_m: number;        // meters from start of segment
+  lat: number | null;
+  lon: number | null;
+  created_at: string;
+}
 
-trail_waypoint (ordered link of waypoints inside a trail)(id INTEGER PK, trail_id INTEGER NOT NULL REFERENCES trail(id), waypoint_id INTEGER NOT NULL REFERENCES waypoint(id), position INTEGER NOT NULL, created_at TEXT NOT NULL)Indexes: (trail_id), (waypoint_id), (trail_id, position)
+export interface Collection {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
 
-auto_waypoint (non‑viewable, belongs to a trail; internal cues)(id INTEGER PK, trail_id INTEGER NOT NULL REFERENCES trail(id), name TEXT NULL, segment_index INTEGER NOT NULL, offset_m REAL NOT NULL, lat REAL NULL, lon REAL NULL, created_at TEXT NOT NULL)Indexes: (trail_id), (trail_id, segment_index)— segment_index: 1‑based segment between ordered waypoints of the trail (between positions k and k+1)— offset_m: meters from the start of that segment— lat/lon optional (may be computed or cached)
+export interface CollectionWaypoint {
+  id: number;
+  collection_id: number;
+  waypoint_id: number;
+  created_at: string;
+}
 
-collection(id INTEGER PK, name TEXT NOT NULL, description TEXT NULL, created_at TEXT NOT NULL)
-
-collection_waypoint(id INTEGER PK, collection_id INTEGER NOT NULL REFERENCES collection(id), waypoint_id INTEGER NOT NULL REFERENCES waypoint(id), created_at TEXT NOT NULL)Indexes: (collection_id), (waypoint_id)
-
-collection_trail(id INTEGER PK, collection_id INTEGER NOT NULL REFERENCES collection(id), trail_id INTEGER NOT NULL REFERENCES trail(id), created_at TEXT NOT NULL)Indexes: (collection_id), (trail_id)
+export interface CollectionTrail {
+  id: number;
+  collection_id: number;
+  trail_id: number;
+  created_at: string;
+}
+```
 
 Notes
 
-Waypoints are independent; trail order is defined in trail_waypoint only.
+- Waypoints are independent; trail order is defined in `trail_waypoint` only.
+- `auto_waypoint` rows are not shown in user lists; they exist for internal navigation/voice cues.
 
-auto_waypoint rows are not shown in standard UI lists; they exist for internal navigation/voice cues.
-
-Migrations
+## Migrations
 
 Implement Kysely bundled migrations (no filesystem I/O):
 
-001_trail → create trail
+- `001_trail` → create trail
+- `002_waypoint` → create waypoint (with elev_m, no trail_id)
+- `003_trail_waypoint` → create link + indexes
+- `004_collections` → create collection, collection_waypoint, collection_trail + indexes
+- `005_auto_waypoint` → create auto_waypoint + indexes
 
-002_waypoint → create waypoint (with elev_m, no trail_id)
+Run the migrator in both `createAppDb()` and `createTestDb()`.
 
-003_trail_waypoint → create link + indexes
+## DB Factory (DI seam)
 
-004_collections → create collection, collection_waypoint, collection_trail + indexes
+- `createAppDb()`: use capacitor-sqlite-kysely + `@capacitor-community/sqlite`; run migrator; return `Kysely<DB>`
+- `createTestDb()`: use SqliteDialect + `better-sqlite3(':memory:')`; run migrator; return `Kysely<DB>` (fresh instance every call)
+- `initAppDb()`: memoized singleton for app runtime (prevents duplicate connections/migration runs)
 
-005_auto_waypoint → create auto_waypoint + indexes
+## Dependency Injection (Repositories Plugin)
 
-Run the migrator in both createAppDb() and createTestDb().
+Repositories accept a `Kysely<DB>` (or a transaction instance). Multi‑table operations are transactional where required.
 
-DB Factory (DI seam)
+Pinia plugin installs repositories for stores via `pinia.use(() => ({ $repos }))`.
 
-createAppDb(): use capacitor-sqlite-kysely + @capacitor-community/sqlite; run migrator; return Kysely<DB>
+```ts
+// plugins/repositories.ts
+export async function installRepositories(pinia: Pinia) {
+  const db = await initAppDb();
+  const repos = markRaw({
+    trails: new TrailsRepo(db),
+    waypoints: new WaypointsRepo(db),
+    collections: new CollectionsRepo(db),
+    autoWaypoints: new AutoWaypointsRepo(db)
+  });
+  pinia.use(() => ({ $repos: repos }));
+}
 
-createTestDb(): use SqliteDialect + better-sqlite3(':memory:'); run migrator; return Kysely<DB>. Every call produces a new DB, DO NOT MEMOIZE TEST INFRA.
+// main.ts
+const pinia = createPinia();
+await installRepositories(pinia);
+```
 
-initAppDb(): memoized singleton for app runtime (prevents duplicate connections/migration runs)
+## Position Semantics (authoritative)
 
-Repository Layer (DI into stores; no Vue imports)
+Table: `trail_waypoint`  
+Column: `position INTEGER NOT NULL`
 
-Repositories accept a Kysely<DB> (or a transaction instance). Multi‑table operations must be transactional.
-
-TrailsRepo
-
-all(): Promise<Trail[]>
-
-create(input: { name: string; description?: string | null }): Promise<number>
-
-rename(id: number, name: string): Promise<void>
-
-remove(id: number): Promise<void>Transactional cascade: delete dependent rows in trail_waypoint, collection_trail, auto_waypoint.
-
-WaypointsRepo
-
-all(): Promise<Waypoint[]>
-
-create(input: { name: string; lat: number; lon: number; elev_m?: number | null }): Promise<number>
-
-addToTrail(input: { trailId: number; name: string; lat: number; lon: number; elev_m?: number | null; position?: number }): Promise<{ waypointId: number; position: number }>Transactional: insert waypoint + link; if position omitted, append after current max
-
-attach(trailId: number, waypointId: number, position?: number): Promise<number> (append if null)
-
-forTrail(trailId: number): Promise<Waypoint[]> *(ordered by trail_waypoint.position; ****excludes ***auto_waypoint**********************)
-
-setPosition(trailId: number, waypointId: number, position: number): Promise<void>
-
-detach(trailId: number, waypointId: number): Promise<void>
-
-rename(id: number, name: string): Promise<void>
-
-remove(id: number): Promise<void>Transactional cascade: delete from trail_waypoint, collection_waypoint, then waypoint.
-
-forLocation(center: { lat: number; lon: number }, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Waypoint & { distance_m?: number }>>Returns waypoints within radius (meters), optionally restricted to a trail, sorted by ascending distance when includeDistance=true.
-
-AutoWaypointsRepo
-
-forTrail(trailId: number): Promise<AutoWaypoint[]>
-
-create(input: { trailId: number; name?: string | null; segment_index: number; offset_m: number; lat?: number | null; lon?: number | null }): Promise<number>
-
-rename(id: number, name: string | null): Promise<void>
-
-setOffset(id: number, segment_index: number, offset_m: number): Promise<void>
-
-remove(id: number): Promise<void>
-
-CollectionsRepo
-
-all(): Promise<Collection[]>
-
-create(input: { name: string; description?: string | null }): Promise<number>
-
-addWaypoint(collectionId: number, waypointId: number): Promise<void>
-
-removeWaypoint(collectionId: number, waypointId: number): Promise<void>
-
-addTrail(collectionId: number, trailId: number): Promise<void>
-
-removeTrail(collectionId: number, trailId: number): Promise<void>
-
-contents(collectionId: number): Promise<{ waypoints: Waypoint[]; trails: Trail[] }> (ordered waypoints returned via appropriate joins)
-
-Position Semantics (authoritative)
-
-Table: trail_waypointColumn: position INTEGER NOT NULLMeaning: The 1‑based ordinal slot of a waypoint within a trail’s ordered list (scoped by trail_id).
+Meaning: The 1‑based ordinal slot of a waypoint within a trail’s ordered list (scoped by `trail_id`).
 
 Invariants & Constraints
 
+```
 -- Prevent duplicates of the same waypoint in a trail
 CREATE UNIQUE INDEX uq_trail_waypoint_pair
   ON trail_waypoint(trail_id, waypoint_id);
@@ -197,416 +234,200 @@ CREATE UNIQUE INDEX uq_trail_waypoint_trail_pos
 CREATE INDEX idx_trail_waypoint_trail      ON trail_waypoint(trail_id);
 CREATE INDEX idx_trail_waypoint_wp         ON trail_waypoint(waypoint_id);
 CREATE INDEX idx_trail_waypoint_trail_pos  ON trail_waypoint(trail_id, position);
+```
 
-Operations (required repo behavior)
+Operations (repository behavior)
 
-All are transactional, and positions must be contiguous (1..N) after each operation.
+- Append (no position provided): insert at `MAX(position)+1` for the given trail.
+- Insert at position p (shift down `>= p`).
+- Reorder a → b (shift intervening range, then set moved row to b).
+- Detach (remove link, then close gap by shifting `> removedPos` up by 1).
 
-Append (no position provided): compute position = 1 + COALESCE(MAX(position), 0) for the given trail_id and insert.
+## Auto Waypoints & Segments
 
-**Insert at position **p (shift down >= p):
+`auto_waypoint` rows belong to a trail and describe internal cues per segment:
 
-UPDATE trail_waypoint
-SET position = position + 1
-WHERE trail_id = :trailId AND position >= :p;
+- `segment_index` identifies a segment between two adjacent positions (if positions are 1..N, segments are 1..N‑1).
+- `offset_m` measures meters from the start of that segment.
 
-INSERT INTO trail_waypoint(trail_id, waypoint_id, position, created_at)
-VALUES (:trailId, :waypointId, :p, :now);
+If future requirements need auto waypoints to follow specific waypoint pairs across reorders, extend the model (e.g., store `from_waypoint_id`, `to_waypoint_id`) and update during reorders.
 
-Reorder from a → b:
+## Distance and Bearing (portable algorithms)
 
--- If a < b (moving down): pull [a+1..b] up by 1
-UPDATE trail_waypoint
-SET position = position - 1
-WHERE trail_id = :trailId AND position > :a AND position <= :b;
+High‑level approach (portable across platforms, no SQL trigonometry required):
 
--- If a > b (moving up): push [b..a-1] down by 1
-UPDATE trail_waypoint
-SET position = position + 1
-WHERE trail_id = :trailId AND position >= :b AND position < :a;
+- Compute a geographic bounding box around a center using meters→degrees and `cos(latitude)` for longitude span.
+- Use the bbox to prefilter candidates via index (`idx_waypoint_lat_lon` on `(lat, lon)`).
+- Apply a coarse ORDER BY (|Δlat| then cyclic |Δlon|) to bring likely nearest first.
+- Compute exact great‑circle distance in JavaScript (Haversine); sort ascending and take the requested `limit`.
+- Compute initial bearing in JavaScript using spherical trigonometry; display as degrees 0..360.
 
--- Place the moved row at b
-UPDATE trail_waypoint
-SET position = :b
-WHERE trail_id = :trailId AND waypoint_id = :waypointId;
+Helpers in `src/utils/geo.ts` implement these steps:
 
-Detach (remove link & close gap):
+- `computeBbox(center, radiusM)` → `{ latMin, latMax, lonMin, lonMax, needsLonFilter, crossing }`
+- `sqlCoarseOrderExprsForCenter(center)` → ORDER BY expressions for coarse proximity
+- `haversineDistanceMeters(a, b)`
+- `initialBearingDeg(a, b)`
+- `fetchWaypointsWithDistance(db, center, opts)` → end‑to‑end nearest fetch (bbox + coarse sort + JS distance)
 
--- Fetch removed position first (SELECT position ...)
-DELETE FROM trail_waypoint
-WHERE trail_id = :trailId AND waypoint_id = :waypointId;
+`WaypointsRepo.withDistanceFrom(center, opts)` delegates to `fetchWaypointsWithDistance` for consistent cross‑platform results.
 
-UPDATE trail_waypoint
-SET position = position - 1
-WHERE trail_id = :trailId AND position > :removedPos;
+## Storage Services (data/storage)
 
-Why not SQLite auto‑increment per trail?
+GPX Service — `gpx.service.ts`
 
-SQLite’s AUTOINCREMENT applies only to a single INTEGER PRIMARY KEY and cannot maintain per‑group sequences like (trail_id). Triggers are possible, but to keep logic explicit and portable, repositories compute next position inside a transaction (append = MAX(position)+1).
+```ts
+export function exportTrailToGpx(trailId: number, opts?: { includeAuto?: boolean }): Promise<FileInfo>
+export function exportCollectionToGpx(collectionId: number, opts?: { includeAuto?: boolean }): Promise<FileInfo>
+export function importGpx(fileUri: string): Promise<{ createdWaypoints: number[]; createdTrails: number[] }>
+```
 
-Kysely append sketch:
-
-const next = await trx
-  .selectFrom('trail_waypoint')
-  .select(({ fn }) => fn.coalesce(fn.max('position'), 0).as('maxpos'))
-  .where('trail_id', '=', trailId)
-  .executeTakeFirst()
-  .then(r => Number(r?.maxpos ?? 0) + 1)
-
-await trx.insertInto('trail_waypoint')
-  .values({ trail_id: trailId, waypoint_id, position: next, created_at: nowIso() })
-  .execute()
-
-Auto Waypoints & Segments
-
-Table: auto_waypoint— segment_index identifies a segment between two adjacent positions in a trail (if positions are 1..N, segments are 1..N‑1).— offset_m is the distance (meters) from the start of that segment.— Reorders can change which pair of waypoints a segment_index refers to; accepted by design for simplicity and speed.
-
-If future requirements need auto waypoints to follow specific waypoint pairs across reorders, extend the model (e.g., store from_waypoint_id, to_waypoint_id) and update during reorders.
-
-Nearby Search (Haversine)
-
-API (WaypointsRepo)
-
-forLocation(
-  center: { lat: number; lon: number },
-  radiusM: number,
-  opts?: { trailId?: number; collection_id?: number; limit?: number; includeDistance?: boolean }
-): Promise<Array<Waypoint & { distance_m?: number }>>
-
-Implementation approach
-
-Bounding box prefilter (cheap rectangle) in app code:
-
-degLat = radiusM / 111320
-
-degLon = radiusM / (111320 * cos(centerLatRad))
-
-Prefilter: WHERE lat BETWEEN lat0−degLat AND lat0+degLat AND lon BETWEEN lon0−degLon AND lon0+degLon
-
-Precise distance with Haversine in SQL for final filter & sort.
-
-Constants
-
-RAD = 0.017453292519943295 (deg→rad)
-
-EARTH_R = 6371000 (meters)
-
-Recommended index
-
-CREATE INDEX idx_waypoint_lat_lon ON waypoint(lat, lon);
-
-Kysely/raw SQL sketch (with optional trail filter):
-
-const RAD = 0.017453292519943295
-const R   = 6371000
-
-// optional INNER JOIN to restrict to a trail
-const base = db.selectFrom('waypoint as w')
-  .$if(!!opts?.trailId, qb =>
-    qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id')
-      .where('tw.trail_id', '=', opts!.trailId!)
-  )
-  // bounding box prefilter
-  .where('w.lat', '>=', lat0 - degLat)
-  .where('w.lat', '<=', lat0 + degLat)
-  .where('w.lon', '>=', lon0 - degLon)
-  .where('w.lon', '<=', lon0 + degLon)
-
-// Haversine (meters)
-const distanceExpr = sql<number>`
-  ${2 * R} * asin(
-    sqrt(
-      pow(sin((${RAD} * (w.lat - ${lat0})) / 2.0), 2) +
-      cos(${RAD} * ${lat0}) * cos(${RAD} * w.lat) *
-      pow(sin((${RAD} * (w.lon - ${lon0})) / 2.0), 2)
-    )
-  )
-`.as('distance_m')
-
-const rows = await base
-  .select([
-    'w.id', 'w.name', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
-    ...(opts?.includeDistance ? [distanceExpr] : []),
-  ])
-  .$if(!!opts?.includeDistance, qb => qb.orderBy('distance_m', 'asc'))
-  .$if(!opts?.includeDistance, qb => qb.orderBy('w.id', 'asc'))
-  .execute()
-
-const nearby = opts?.includeDistance
-  ? rows.filter(r => r.distance_m! <= radiusM)
-  : rows // or compute client‑side if distances weren’t selected
-
-return opts?.limit ? nearby.slice(0, opts.limit) : nearby
-
-Storage Services (data/storage)
-
-GPX Service — gpx.service.ts
-
-exportTrailToGpx(trailId: number, opts?: { includeAuto?: boolean }): Promise<FileInfo>Default: includeAuto = false
-
-exportCollectionToGpx(collectionId: number, opts?: { includeAuto?: boolean }): Promise<FileInfo>
-
-importGpx(fileUri: string): Promise<{ createdWaypoints: number[]; createdTrails: number[] }>Transactional: insert waypoints/trails and link rows
-
-Preferences Service — preferences.service.ts
-
-getUnits()/setUnits(value: "metric" | "imperial")
-
-getCompassMode()/setCompassMode(value: "magnetic" | "true")
-
-getAudioCuesEnabled()/setAudioCuesEnabled(value: boolean)
-
-Ionic UI & Navigation
+## Ionic UI & Navigation
 
 Router & Shell
 
-Tabs layout using IonTabs with IonTabBar slot="bottom" and large touch targets (≥48×48 dp).Tabs: GPS, Waypoints, Trails, Collections.
-
-Each page uses standard IonPage → IonHeader (IonToolbar, Title) → IonContent.
-
-Accessibility (required)
-
-Every actionable control has accessible names/labels (programmatic, not visual‑only).
-
-Avoid placeholder‑only forms; use aria-label or ion-label.
-
-Ensure keyboard operability and visible focus indicators.
-
-Screen‑reader friendly announcements for critical events (e.g., “Next waypoint updated”).
-
-Respect user preferences (audio cues, units) via Preferences service.
+- Tabs layout using `IonTabs` with `IonTabBar` (slot="bottom").
+- Tabs: GPS, Waypoints, Trails, Collections, Settings, Debug.
+- Pages share a sticky header toolbar (`PageHeaderToolbar.vue`) with Settings and Debug buttons.
 
 Pages
 
-1) GPS Page (GpsPage.vue)
+### 1) GPS Page (`GpsPage.vue`)
 
-Purpose: Navigation HUD with compass and distance/heading to current selection; “Follow Trail” mode shows next waypoint cues.
+Purpose: Navigation HUD with compass and distance/bearing to the current target; Follow‑Trail mode advances through the selected trail’s waypoints.
 
-Core UI (Ionic):
+Core UI:
 
-IonHeader with segmented controls: [Waypoint | Trail] selection scope
+- IonHeader with segmented controls: [Waypoint | Trail]
+- Trail scope: select a trail; show current/next waypoint and Start/Stop follow
+- Waypoint scope: select waypoint
+- Telemetry card: compass header, Distance, Bearing; position readout
+- FAB “+” marks current position as a waypoint or trail waypoint (based on scope)
+- When Trail scope selected and none chosen: callout to “Record New Trail” to create and select a new trail
 
-Selection pickers:
+Compass Usage:
 
-Waypoint: IonItem + IonSelect (searchable list optional)
+- Uses a Capacitor Heading plugin (`plugins/heading`) to stream heading readings and apply declination via `setLocation`.
+- Preference `compassMode` (`'magnetic' | 'true'`) controls whether the UI shows Magnetic North or True North.
+- The header text toggles the mode (compact control); values persist via `usePrefsStore`.
+- Bearing to target is computed in JS (`initialBearingDeg`) from current GPS position and target coordinate.
 
-Trail: IonItem + IonSelect + current/next waypoint readout
+### 2) Waypoints Page (`WaypointsPage.vue`)
 
-Compass/telemetry:
+Purpose: Nearby list, create/edit/delete, attach to trails.
 
-Large readouts in IonCard blocks: Heading, Bearing, Distance, Delta (heading − bearing)
+Core UI:
 
-Actions:
-
-IonButton Start Following / Stop
-
-IonToggle Audio Cues
-
-IonButton Recenter/Calibrate
-
-Optional FAB (IonFab) for quick Mark waypoint (creates a waypoint at current location and optionally attaches to selected trail)
-
-Behavior:
-
-Uses Geolocation to update heading/location.
-
-In “Follow Trail,” computes current segment from trail_waypoint order; auto‑advance to next waypoint when within threshold; announce changes.
-
-Does not display or edit auto_waypoint rows; internal cues may be used for audio timing.
-
-Data:
-
-Reads useWaypoints (selected waypoint), useTrails (selected trail, ordered waypoints). Preferences: units, compass mode, audio cues.
-
-2) Waypoints Page (WaypointsPage.vue)
-
-Purpose: Browse, create, edit waypoints; attach/detach to trails; export/import via GPX.
-
-Core UI (Ionic):
-
-IonSearchbar (filter by name)
-
-IonList of waypoints (name, coords, optional elevation)
-
-IonItemSliding with IonItemOptions:
-
-Attach to Trail (picker)
-
-Rename
-
-Delete
-
-Toolbar actions:
-
-Add Waypoint (uses current GPS or manual entry)
-
-Import GPX
-
-Export Selected (optional)
+- Search + list, sliding actions (Attach / Rename / Delete)
+- Import/Export placeholders
+- Live location toggle to auto-sort by proximity
 
 Behavior:
 
-Create → WaypointsRepo.create()
+- Create → `WaypointsRepo.create()`; Attach → `WaypointsRepo.attach()` (or `addToTrail()` when creating + attach)
+- Delete → `WaypointsRepo.remove()` (cascades link rows)
+- Nearby list uses `withDistanceFrom()`
 
-Attach → WaypointsRepo.attach() (or addToTrail() when creating + attach)
+### 3) Trails Page (`TrailsPage.vue`)
 
-Delete → WaypointsRepo.remove() (cascades link rows)
+Purpose: Manage trails and their ordered waypoints; export to GPX.
 
-Import/Export uses GPX service.
+Core UI:
 
-3) Trails Page (TrailsPage.vue)
-
-Purpose: Manage trails and the ordered sequence of waypoints.
-
-Core UI (Ionic):
-
-Trail list: IonList with Create, Rename, Delete
-
-Trail detail (split view or modal):
-
-Ordered waypoints as IonReorderGroup + IonItem with handle to drag (updates position)
-
-Add existing waypoint (picker) or Add New & Attach
-
-Detach waypoint
-
-Optional: show Auto Waypoints count; manage in a separate management modal
+- Trails list (Create, Rename, Delete)
+- Trail detail card with waypoints list; actions: Export GPX, Add Waypoint, Attach Existing (wizard)
+- Waypoint actions: Move Up/Down, Detach
 
 Behavior:
 
-Reorder persists via WaypointsRepo.setPosition(...)
+- Reorder persists via `WaypointsRepo.setPosition(...)`
+- Add/Attach/Detach call corresponding repo methods
+- Delete trail cascades link rows and auto waypoints (repo handles tx)
 
-Add/Attach/Detach call corresponding repo methods
+### 4) Collections Page (`CollectionsPage.vue`)
 
-Delete trail cascades link rows and auto waypoints (repo handles tx)
+Purpose: Group waypoints and trails into collections; export as GPX.
 
-4) Collections Page (CollectionsPage.vue)
+Core UI:
 
-Purpose: Group waypoints and trails into collections; export collections as GPX.
-
-Core UI (Ionic):
-
-Collections list with create/rename/delete
-
-Collection detail:
-
-Two lists (segments or tabs): Waypoints and Trails
-
-Add/remove members
-
-Export Collection (GPX)
+- Collections list with create/rename/delete
+- Collection detail: Waypoints and Trails sections
+- “Add Waypoints/Trails” via Multi‑Select Wizard
 
 Behavior:
 
-Uses CollectionsRepo for membership ops
+- Uses `CollectionsRepo` for membership ops
+- Export uses GPX service (default excludes auto waypoints)
 
-Export uses GPX service (default excludes auto waypoints)
+### 5) Settings Page (`SettingsPage.vue`)
 
-Do not implement Favorites yet. Intentionally excluded from this version.
+Purpose: Manage user preferences.
 
-DI into Vue
+Core UI:
 
-Plugin (plugins/repositories.ts):await initAppDb() → create repo instances → pinia.use(() => ({ $repos: repos }))
+- Units (Metric/Imperial)
+- Audio Cues (On/Off)
+- Compass Mode (True North vs Magnetic)
 
-Stores access repos via this.$repos; no SQL in stores/pages
+Behavior:
 
-Stores (shape)
+- Binds to `usePrefsStore`; persists via Capacitor Preferences with versioned migrations
 
-useTrails — list + refresh/create/rename/remove
+### 6) Debug Page (`DebugPage.vue`)
 
-useWaypoints — byTrail: Record<number, Waypoint[]>, loadForTrail/addToTrail/detach/setPosition/rename/remove
+Purpose: Diagnostics for development/manual testing.
 
-useCollections — list + contents, add/remove {waypoint, trail}
+## DI into Vue
 
-Testing Strategy
+- `installRepositories(pinia)` builds repos from `initAppDb()` and installs a Pinia plugin providing `$repos`.
+- Stores access repos via `this.$repos`; no SQL in stores/pages.
+
+## Stores (shape)
+
+- `useTrails` — `list` + `refresh/create/rename/remove`
+- `useWaypoints` — `byTrail: Record<number, Waypoint[]>`, `loadForTrail/addToTrail/attach/detach/setPosition/rename/remove/withDistanceFrom`
+- `useCollections` — `list` + `contents`, `add/remove { waypoint, trail }`
+- `usePrefs` — settings/preferences store (`units`, `compassMode`, `audioCuesEnabled`), persisted via Capacitor Preferences with versioned migrations; hydrated on app startup
+
+## Multi‑Select Wizard (UI component)
+
+Purpose: Reusable modal to select multiple items (waypoints or trails) and commit them in bulk. Used by Collections and Trails pages to add members efficiently.
+
+Location: `src/components/MultiSelectWizard.vue` with types in `src/types/multi-select.ts`
+
+Props/Events:
+
+- Props: `open: boolean`, `config: MultiSelectConfig`
+- Emits: `update:open` (boolean), `done(addedCount: number)`
+
+`MultiSelectConfig`:
+
+- `title: string` — modal title
+- `getItems(): Promise<MultiSelectItem[]>` — provides items; called on open and search reset
+- `commit(ids: number[]): Promise<void>` — invoked when user confirms; perform membership writes
+- `ctaLabel?: string` — customize commit button label (default: “Add Selected”)
+
+`MultiSelectItem`:
+
+- `{ id: number; label: string; sublabel?: string | null; disabled?: boolean }`
+
+Behavior:
+
+- Search filter; Select All / Clear controls; disabled items cannot be selected
+- Shows loading/empty states; items with checkbox selection
+- After commit resolves, emits `done(count)` and closes. Caller shows success action/toast.
+
+## Testing Strategy
 
 Rule of thumb: fake only the layer immediately below the unit under test (prefer fakes over mocks).
 
-Store tests (unit): inject fake repositories (simple in‑memory fakes). Do not mock Kysely/DB. Assert state transitions.
+- Store tests (unit): inject fake repositories (simple in‑memory fakes). Do not mock Kysely/DB. Assert state transitions.
+- Repository tests (integration): use the real in‑memory DB from `createTestDb()`; no mocks of Kysely/driver. Assert SQL behavior, ordering, transactions, cascades.
+- DB/Migration tests: fake as little as possible (ideally nothing). Run migrator on a fresh in‑memory DB.
 
-Repository tests (integration): use the real in‑memory DB from createTestDb(); no mocks of Kysely/driver. Assert SQL behavior, ordering, transactions, cascades.
+Misc: if targeting web, configure the SQLite plugin’s web/WASM adapter.
 
-DB/Migration tests: fake as little as possible (ideally nothing). Run migrator on a fresh in‑memory DB; optionally simulate legacy waypoint.trail_id for the upgrade.
+## Limitations
 
-Suggested helpers
-
-test/utils/db.ts — makeDb(seed_data) (wraps createTestDb()), withRollback(db, fn) (transaction that forces rollback)
-
-test/fakes/*.ts — fakeTrailsRepo(), fakeWaypointsRepo(), fakeCollectionsRepo(), fakeAutoWaypointsRepo() for store tests
-
-Installation Contracts
-
-p
-npm add kysely @capacitor-community/sqlite capacitor-sqlite-kysely @capacitor/filesystem @capacitor/preferences @capacitor/geolocation
-pnpm add -D better-sqlite3 vitest @types/node
-
-Assumptions:
-
-Capacitor initialized; iOS/Android platforms added.
-
-If targeting web, configure the SQLite plugin’s web/WASM adapter.
-
-Acceptance Criteria
-
-Build & Types
-
-Project compiles; repositories and DB factory contain no Vue imports.
-
-DB
-
-initAppDb() memoized singleton; createTestDb() fresh in‑memory instance.
-
-Migrations run in both environments.
-
-Schema
-
-waypoint has elev_m (nullable) and no trail_id.
-
-trail_waypoint defines ordering with required indexes and uniqueness constraints.
-
-auto_waypoint exists with segment_index, offset_m, optional lat/lon; excluded from standard user lists.
-
-Collections tables and indexes exist.
-
-Repositories
-
-Methods implemented as specified; multi‑table operations transactional.
-
-Position logic maintained by the repo (append/insert/reorder/detach) keeping per‑trail positions contiguous; SQLite is not relied upon for per‑trail sequencing.
-
-WaypointsRepo.forTrail() returns only user waypoints in position order.
-
-WaypointsRepo.forLocation() implements bounding‑box prefilter + Haversine; supports trailId, limit, includeDistance; idx_waypoint_lat_lon exists.
-
-Storage Services
-
-GPX export/import works; exports exclude auto waypoints by default (opt‑in flag exists).
-
-Preferences getters/setters persist typed values.
-
-Ionic UI
-
-Four pages implemented with Ionic components: GPS, Waypoints, Trails, Collections.
-
-Bottom tab bar present; tap targets ≥48×48 dp.
-
-GPS page shows heading, bearing, distance, follow‑trail mode with next‑waypoint advancement and accessible announcements.
-
-Stores
-
-Stores access repos via this.; no SQL in stores/pages.
-
-useWaypoints.addToTrail() refreshes byTrail[trailId] after writes.
-
-Tests
-
-Store tests use fakes for repos (no DB).
-
-Repository tests use the real in‑memory DB (no mocks).
-
-DB/migration tests fake as little as possible.
-
-Non‑Goals
-
-Favorites not implemented in this version.
+- Background location on web is limited; native bridges may be required for robust background tracking.
 

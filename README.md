@@ -1,24 +1,33 @@
 # Bold Explorer (Ionic + Vue 3)
 
-Offline-first waypoint/trail app built with Ionic Vue, Pinia, and SQLite via Capacitor + Kysely.
-
-Bold Explorer lets you create trails and waypoints, work fully offline, and leverage device features (GPS, filesystem, preferences). Data is stored locally using SQLite through Capacitor, with queries written via Kysely for type safety and parameterization.
+Offline‑first waypoint/trail app built with Ionic Vue, Pinia, and SQLite via Capacitor + Kysely.
 
 ## Overview
 
-- UI: Ionic Framework components with Vue 3 and Pinia.
-- Data: SQLite (Capacitor) with Kysely query builder and bundled migrations.
-- Filesystem/Prefs/Sensors: Capacitor Filesystem, Preferences, Geolocation.
-- Spec: See WAYPOINT_TRAIL_SPEC.md for the authoritative data model and behavior.
+Bold Explorer is a trail and waypoint recorder designed to work fully offline.
+
+- GPS HUD with compass (Magnetic/True), bearing and distance to target, and Follow‑Trail mode that advances to the next waypoint.
+- “Record New Trail” callout on GPS when Trail scope selected; FAB “+” records waypoints to a trail or standalone based on scope.
+- Waypoints: nearby list by distance, search, create/rename/delete, attach to trails.
+- Trails: create/rename/delete; manage ordered waypoints (attach existing via wizard, add new, move up/down, detach); export to GPX.
+- Collections: group waypoints and trails; bulk add via Multi‑Select Wizard; export to GPX.
+- Settings: units, compass mode, audio cues; Debug page for diagnostics. Sticky header provides quick Settings/Debug.
+- Tech: Ionic Vue + Pinia; SQLite via Kysely; DI via Pinia plugin; Capacitor for Filesystem/Preferences/Geolocation/Heading.
+
+See `WAYPOINT_TRAIL_SPEC.md` for the storage‑first architecture and detailed behavior.
 
 ## Repository Layout
 
 - `src/`
-  - `db/`: Kysely schema, migrations provider, DB factory (`createAppDb`, `createTestDb`, `initAppDb`).
+  - components/: Components that are used throughout the app in various pages.
+  - composables: Small utilities used in components or pages that make doing things possible, have their own lifecycle hooks from vue.
+  - `db/`: Kysely schema, migrations provider, DB factory (`createAppDb`, `createTestDb`, `initAppDb`). Some DB helpers exist for native and web based testing, for various reasons.
   - `data/repositories/`: Trails, Waypoints, Collections, Auto-Waypoints (transactional, position logic).
+  - data/ stores: Storage utilities like file writing, and services for gpx handling.
   - `plugins/`: Repositories DI plugin (provides `$repos` to Pinia stores).
   - `stores/`: `useTrails`, `useWaypoints`, `useCollections` (no SQL in stores/pages).
-  - `pages/`: `GpsPage.vue`, `WaypointsPage.vue`, `TrailsPage.vue`, `CollectionsPage.vue`.
+  - `components/`: common widgets like `PageHeaderToolbar.vue`, `MultiSelectWizard.vue`.
+  - `pages/`: `GpsPage.vue`, `WaypointsPage.vue`, `TrailsPage.vue`, `CollectionsPage.vue`, `SettingsPage.vue`, `DebugPage.vue`.
   - `router/`: Tabbed routes under `/tabs/*`.
 - `tests/`: Vitest unit tests and Cypress e2e scaffolding.
 
@@ -26,6 +35,7 @@ Bold Explorer lets you create trails and waypoints, work fully offline, and leve
 
 - Node.js 18+ (20+ recommended) and pnpm via Corepack.
 - Capacitor tooling and platform SDKs (Android Studio for Android builds).
+- Note: The project pins a specific subset of versions for specific packages, capacitor and capacitor/sqlite do not handle the latest versions gracefully.
 
 ## Setup
 
@@ -44,30 +54,26 @@ Bold Explorer lets you create trails and waypoints, work fully offline, and leve
 - `pnpm test:e2e`: Cypress end-to-end tests.
 - `pnpm lint`: ESLint (Vue 3 + TS rules).
 
-## Security & Data Safety
-
-- SQL injection hardening: all queries use Kysely parameter binding. The `sqlDistanceMetersForAlias` helper validates SQL aliases (identifier whitelist) and enforces coordinate ranges for safety.
-- Coordinate types: use the `LatLng` interface (`src/types/latlng.ts`) for any `{ lat, lon }` inputs. A runtime guard `assertLatLng` ensures lat ∈ [-90, 90] and lon ∈ [-180, 180].
-- Insert IDs: repositories retrieve new IDs using `.returning('id')` for reliable behavior across SQLite drivers (e.g., sql.js / jeep-sqlite).
-
 ## Android (Capacitor)
 
 - Add Android platform (one-time):
   - `pnpm exec cap add android`
 - Build web and sync native:
   - `pnpm build`
-  - `pnpm exec cap sync android`
+  - `pnpm cap sync android`
 - Open in Android Studio:
-  - `pnpm exec cap open android`
+  - `pnpm cap open android`
 
 Notes
 
 - If you develop in both Windows and WSL, run `pnpm install` separately in each environment so platform-specific optional dependencies (e.g., Rollup native, Capacitor binaries) are correct.
+- capacitor cli is a dev dep, so that pnpm cap works.
 
 ## Testing
 
 - Unit (Vitest): `pnpm test:unit`
 - E2E (Cypress): `pnpm test:e2e`
+- A test harness exists that lets you benchmark the speed of indexeddb vs. native better-sqlite backed tests for repos. I haven't decided on an approach yet.
 
 Conventions
 
@@ -82,7 +88,7 @@ Recommended test patterns (from the spec):
 
 ## Design Spec
 
-- The full storage-first design is in `WAYPOINT_TRAIL_SPEC.md` (schema, migrations, repo APIs, UI expectations, and acceptance criteria). Implement features and tests to match the spec.
+- The storage‑first design is in `WAYPOINT_TRAIL_SPEC.md` (schema, migrations, repo APIs, UI expectations). Update the spec to reflect the latest code as the project evolves.
 
 ## Troubleshooting
 

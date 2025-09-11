@@ -29,7 +29,7 @@ Run from `bold_explorer/` and use pnpm:
 - Components/views: PascalCase file names (e.g., `TabsPage.vue`, `Tab1Page.vue`).
 - Imports: Use alias `@` for `src/` (e.g., `@/views/Tab1Page.vue`).
 - Lint rules: Vue 3 essential + TypeScript recommended; fix warnings before submitting.
-- Types: Avoid using any unless absolutely necessary, ask an expert user for typing help if you require it.
+- Types: Avoid using the `any` type unless absolutely necessary, ask an expert user for typing help if you require it.
 
 ## Testing Guidelines
 
@@ -72,7 +72,7 @@ MSG
 ## Security & Configuration Tips
 
 - Do not commit secrets. Use local env files (`.env.local` is ignored) and Capacitor platform configs per environment.
-- Mobile builds: Capacitor outputs to `android/` or `ios/` (not tracked). After web build, run native sync as needed.
+- Mobile builds: Capacitor outputs to `android/` or `ios/` (which are mostly tracked). These dirs have their own .gitignores. After web build, run native sync as needed.
 
 ## Agent-Specific Instructions
 
@@ -81,16 +81,18 @@ MSG
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
 - Example:
 
-  - `git add -A && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`
+  - `git add <files> && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`
   - Or using the preferred here‑doc style for multi‑line bodies (recommended):
 
     ```
-    git add -A && git commit -F - <<'MSG'
+    git add <files> && git commit -F - <<'MSG'
     chore(lint): align settings with Vue 3
 
     Explain rule changes, affected files, and local test/lint results.
     MSG
     ```
+
+- When editing design specs (e.g., `WAYPOINT_TRAIL_SPEC.md`), do not remove Markdown headings or code fences. Preserve structure and formatting; add to sections rather than flattening or inlining code.
 
 ## Accessibility
 
@@ -98,6 +100,7 @@ MSG
 - Use `aria-label` only when there is no visible text (e.g., icon-only buttons) or when additional clarification is required for assistive tech. Keep it short and consistent with the visual purpose.
 - If a nearby text node is the label, prefer `aria-labelledby` referencing that text rather than duplicating with `aria-label`.
 - Keep the accessible name in sync with the UI. Avoid mismatches like a button that visually reads “Compass (True)” but announces a different label.
+- Always avoid changing labels mixed with stateful controls. For example, a mute checkbox, that says mute when unchecked and unmute when checked. having to keep track of two states is very confusing for the user.
 - Do not duplicate the visible text with `aria-label`; it’s redundant and may confuse screen readers. Let the visible text be the accessible name by default.
 
 ### Testing TODOs

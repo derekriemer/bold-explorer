@@ -32,6 +32,8 @@
           <ion-card-content>
             <div class="section-actions">
               <ion-button size="small" fill="outline" @click="onExport(c.id as number)">Export GPX</ion-button>
+              <ion-button size="small" fill="solid" color="primary" @click="openAddWaypoints(c.id as number)">Add Waypoints</ion-button>
+              <ion-button size="small" fill="solid" color="tertiary" @click="openAddTrails(c.id as number)">Add Trails</ion-button>
             </div>
             <h3>Waypoints</h3>
             <ion-list>
@@ -39,7 +41,7 @@
                 <ion-label>
                   <div class="row">
                     <span>{{ w.name }}</span>
-                    <span class="sub">{{ w.lat.toFixed(5) }}, {{ w.lon.toFixed(5) }}</span>
+                    <span class="sub" v-if="w.description">{{ w.description }}</span>
                   </div>
                 </ion-label>
                 <ion-button size="small" fill="clear" color="danger"
@@ -84,6 +86,10 @@
           { text: 'Create', role: 'confirm', handler: (data: any) => handleAdd(data) }
         ]" @didDismiss="addOpen = false" />
 
+      <MultiSelectWizard v-if="wizardConfig" :open="wizardOpen" :config="wizardConfig"
+        @update:open="(v: boolean) => wizardOpen = v"
+        @done="onWizardDone" />
+
       <ion-toast :is-open="toastOpen" :message="toastMessage" :duration="1800" @didDismiss="toastOpen = false" />
     </ion-content>
   </ion-page>
@@ -94,19 +100,28 @@ import {
   IonButtons, IonButton, IonList, IonItem, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonAlert, IonToast
 } from '@ionic/vue';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { useCollections } from '@/stores/useCollections';
 import { exportCollectionToGpx } from '@/data/storage/gpx/gpx.service';
 import { useActions } from '@/composables/useActions';
+import { useWaypoints } from '@/stores/useWaypoints';
+import { useTrails } from '@/stores/useTrails';
+import MultiSelectWizard from '@/components/MultiSelectWizard.vue';
+import type { MultiSelectConfig, MultiSelectItem } from '@/types/multi-select';
 
 const collections = useCollections();
 const actions = useActions();
+const wps = useWaypoints();
+const trails = useTrails();
 
 const openId = ref<number | null>(null);
 const addOpen = ref(false);
 const toastOpen = ref(false);
 const toastMessage = ref('');
+const wizardOpen = ref(false);
+const wizardConfig = ref<MultiSelectConfig | null>(null);
+const wizardCollectionId = ref<number | null>(null);
 
 function onAdd() { addOpen.value = true; }
 
@@ -151,8 +166,73 @@ async function removeTrail(collectionId: number, trailId: number) {
 function showToast(msg: string) { toastMessage.value = msg; toastOpen.value = true; }
 
 onMounted(async () => {
-  await collections.refresh();
+  await Promise.all([collections.refresh(), wps.refreshAll(), trails.refresh()]);
 });
+
+function makeWaypointConfig(collectionId: number): MultiSelectConfig {
+  return {
+    title: 'Add Waypoints',
+    async getItems(): Promise<MultiSelectItem[]> {
+      // Filter out ones already in the collection
+      const existing = new Set((collections.contents[collectionId]?.waypoints ?? []).map(w => Number(w.id)));
+      return (wps.all || []).map(w => ({
+        id: Number(w.id),
+        label: w.name,
+        sublabel: w.description ?? undefined,
+        disabled: existing.has(Number(w.id))
+      }));
+    },
+    async commit(ids: number[]) {
+      for (const id of ids) {
+        await collections.addWaypoint(collectionId, id);
+      }
+    },
+    ctaLabel: 'Add Waypoints'
+  };
+}
+
+function makeTrailConfig(collectionId: number): MultiSelectConfig {
+  return {
+    title: 'Add Trails',
+    async getItems(): Promise<MultiSelectItem[]> {
+      const existing = new Set((collections.contents[collectionId]?.trails ?? []).map(t => Number(t.id)));
+      return (trails.list || []).map(t => ({
+        id: Number(t.id),
+        label: t.name,
+        sublabel: 'Trail',
+        disabled: existing.has(Number(t.id))
+      }));
+    },
+    async commit(ids: number[]) {
+      for (const id of ids) {
+        await collections.addTrail(collectionId, id);
+      }
+    },
+    ctaLabel: 'Add Trails'
+  };
+}
+
+async function openAddWaypoints(collectionId: number) {
+  wizardCollectionId.value = collectionId;
+  if (!collections.contents[collectionId]) await collections.loadContents(collectionId);
+  wizardConfig.value = makeWaypointConfig(collectionId);
+  wizardOpen.value = true;
+}
+
+async function openAddTrails(collectionId: number) {
+  wizardCollectionId.value = collectionId;
+  if (!collections.contents[collectionId]) await collections.loadContents(collectionId);
+  wizardConfig.value = makeTrailConfig(collectionId);
+  wizardOpen.value = true;
+}
+
+function onWizardDone(count: number) {
+  if (!wizardCollectionId.value) return;
+  const msg = wizardConfig.value?.title?.includes('Waypoints')
+    ? `Added ${count} waypoint${count === 1 ? '' : 's'}`
+    : `Added ${count} trail${count === 1 ? '' : 's'}`;
+  actions.show(msg, { kind: 'success' });
+}
 </script>
 <style scoped>
 h2 { margin: 0 0 4px; font-weight: 600; }

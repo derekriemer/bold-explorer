@@ -192,11 +192,13 @@ function handleAddConfirm (data: any): boolean
   // Fire async creation and allow alert to close immediately
   (async () =>
   {
-    await wps.create({ name, lat, lon, elev_m: elev });
+    const id = await wps.create({ name, lat, lon, elev_m: elev });
     await wps.refreshAll();
-    await actionsService.show("Weypoint added!", {
+    actionsService.show('Waypoint added', {
+      kind: 'success',
       canUndo: true,
-    })
+      onUndo: async () => { await wps.remove(id); await wps.refreshAll(); }
+    });
   })();
   return true;
 }

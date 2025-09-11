@@ -90,7 +90,6 @@ import
 } from '@ionic/vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { computed, onMounted, ref, watch } from 'vue';
-import type { Selectable } from 'kysely';
 import { useRoute } from 'vue-router';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
@@ -109,10 +108,10 @@ const route = useRoute();
 const actions = useActions();
 
 const query = ref('');
-type WpWithDistance = Selectable<Waypoint> & { distance_m: number };
 const prefs = usePrefsStore();
 const units = computed(() => prefs.units);
-const nearby = ref<WpWithDistance[] | null>(null);
+// Map of waypoint id -> distance (meters). Keeps distances when names change.
+const distances = ref<Record<number, number>>({});
 const liveUpdates = ref(false);
 const expandedId = ref<number | null>(null);
 
@@ -123,7 +122,13 @@ function toggleExpand(id: number)
   expandedId.value = expandedId.value === id ? null : id;
 }
 
-const baseList = computed(() => nearby.value ?? wps.all);
+const baseList = computed(() =>
+{
+  const dist = distances.value;
+  const hasDist = Object.keys(dist).length > 0;
+  if (!hasDist) return wps.all as any;
+  return (wps.all as any).map((w: any) => ({ ...w, distance_m: dist[w.id as number] }));
+});
 const filtered = computed(() =>
 {
   const q = query.value.trim().toLowerCase();
@@ -135,7 +140,10 @@ const filtered = computed(() =>
 async function refreshByDistance ()
 {
   if (!gps.value) return;
-  nearby.value = await wps.withDistanceFrom({ lat: gps.value.lat, lon: gps.value.lon });
+  const list = await wps.withDistanceFrom({ lat: gps.value.lat, lon: gps.value.lon });
+  const map: Record<number, number> = {};
+  for (const r of list as any[]) { map[Number((r as any).id)] = Number((r as any).distance_m); }
+  distances.value = map;
 }
 
 async function onToggleLive ()
@@ -194,6 +202,7 @@ function handleAddConfirm (data: any): boolean
   {
     const id = await wps.create({ name, lat, lon, elev_m: elev });
     await wps.refreshAll();
+    if (Object.keys(distances.value).length > 0) { await refreshByDistance(); }
     actionsService.show('Waypoint added', {
       kind: 'success',
       canUndo: true,
@@ -239,7 +248,9 @@ async function doEdit (data: any)
   const prev = prevSnapshot.value;
   await wps.update(id, { name, lat, lon, elev_m: elev });
   await wps.refreshAll();
-  actions.show('Waypoint updated', {
+  // If showing nearby distances, recompute to keep overlay in sync
+  if (Object.keys(distances.value).length > 0) { await refreshByDistance(); }
+  actionsService.show('Waypoint updated', {
     kind: 'success',
     canUndo: !!prev,
     onUndo: prev ? async () =>
@@ -266,6 +277,7 @@ async function doDelete ()
   const snap = deleteSnapshot.value;
   await wps.remove(deleteId.value);
   await wps.refreshAll();
+  if (Object.keys(distances.value).length > 0) { await refreshByDistance(); }
   actions.show('Waypoint deleted', {
     kind: 'success',
     canUndo: !!snap,
@@ -306,7 +318,10 @@ onMounted(async () =>
   const center = getCenterFromRoute();
   if (center)
   {
-    nearby.value = await wps.withDistanceFrom(center);
+    const list = await wps.withDistanceFrom(center);
+    const map: Record<number, number> = {};
+    for (const r of list as any[]) { map[Number((r as any).id)] = Number((r as any).distance_m); }
+    distances.value = map;
   }
 });
 

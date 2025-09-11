@@ -184,29 +184,61 @@ export class WaypointsRepo {
     // Bounding box in degrees for ~50km radius (adjustable if needed)
     const radiusM = 50000;
     const degLat = radiusM / 111320;
-    const degLon = radiusM / (111320 * Math.cos(center.lat * RAD));
+    const latMin = Math.max(-90, center.lat - degLat);
+    const latMax = Math.min(90, center.lat + degLat);
 
-    // Candidate limit: fetch a bit more than requested to refine by exact haversine
-    const candidateLimit = opts?.limit ? Math.max(opts.limit * 3, opts.limit + 25) : undefined;
+    const cosLat = Math.cos(center.lat * RAD);
+    let needsLonFilter = true;
+    let crossing = false;
+    let lonMin = -180;
+    let lonMax = 180;
+    if (Math.abs(cosLat) < 1e-6) {
+      // Near the poles, longitude is meaningless for distance; include all longitudes
+      needsLonFilter = false;
+    } else {
+      const degLon = radiusM / (111320 * cosLat);
+      if (degLon >= 180) {
+        needsLonFilter = false; // covers the globe in longitude
+      } else {
+        const lonMinRaw = center.lon - degLon;
+        const lonMaxRaw = center.lon + degLon;
+        crossing = lonMinRaw < -180 || lonMaxRaw > 180;
+        const norm = (x: number) => ((x + 180) % 360 + 360) % 360 - 180;
+        lonMin = crossing ? norm(lonMinRaw) : lonMinRaw;
+        lonMax = crossing ? norm(lonMaxRaw) : lonMaxRaw;
+      }
+    }
 
-    const base = this.db
+    // Build base query with lat filter and optional lon filter, handling anti-meridian crossing
+    let base = this.db
       .selectFrom('waypoint as w')
       .$if(!!opts?.trailId, (qb: any) =>
         qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
       )
-      .where('w.lat', '>=', center.lat - degLat)
-      .where('w.lat', '<=', center.lat + degLat)
-      .where('w.lon', '>=', center.lon - degLon)
-      .where('w.lon', '<=', center.lon + degLon);
+      .where('w.lat', '>=', latMin)
+      .where('w.lat', '<=', latMax);
 
-    // Coarse sort by component-wise closeness so JS sort does less work
+    if (needsLonFilter) {
+      if (crossing) {
+        base = base.where(sql`(w.lon >= ${lonMin} OR w.lon <= ${lonMax})`);
+      } else {
+        base = base.where('w.lon', '>=', lonMin).where('w.lon', '<=', lonMax);
+      }
+    }
+
+    // Candidate limit: fetch a bit more than requested to refine by exact haversine
+    const candidateLimit = opts?.limit ? Math.max(opts.limit * 3, opts.limit + 25) : undefined;
+
+    // Coarse sort by component-wise closeness so JS sort does less work.
+    // For longitude, account for wrap-around at the anti-meridian.
     const absLat = sql`abs(w.lat - ${center.lat})`;
-    const absLon = sql`abs(w.lon - ${center.lon})`;
+    const absDeltaLon = sql`abs(w.lon - ${center.lon})`;
+    const absLonCyclic = sql`CASE WHEN ${absDeltaLon} > 180 THEN 360 - ${absDeltaLon} ELSE ${absDeltaLon} END`;
 
     const rows = await base
       .select(['w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at'])
       .orderBy(absLat)
-      .orderBy(absLon)
+      .orderBy(absLonCyclic)
       .$if(!!candidateLimit, (qb: any) => qb.limit(candidateLimit!))
       .execute();
 

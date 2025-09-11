@@ -12,11 +12,11 @@
       <ion-list inset>
         <ion-item>
           <ion-label>Units</ion-label>
-          <ion-segment v-model="units" @ionChange="onUnitsChange" aria-label="Units">
-            <ion-segment-button value="metric" aria-label="Metric units">
+          <ion-segment v-model="units" @ionChange="onUnitsChange">
+            <ion-segment-button value="metric">
               <ion-label>Metric</ion-label>
             </ion-segment-button>
-            <ion-segment-button value="imperial" aria-label="Imperial units">
+            <ion-segment-button value="imperial">
               <ion-label>Imperial</ion-label>
             </ion-segment-button>
           </ion-segment>
@@ -24,12 +24,12 @@
 
         <ion-item lines="full">
           <ion-label>Audio Cues</ion-label>
-          <ion-toggle v-model="audioCues" @ionChange="onAudioToggle" aria-label="Toggle audio cues"/>
+          <ion-toggle v-model="audioCues" @ionChange="onAudioToggle"/>
         </ion-item>
 
         <ion-item lines="full">
           <ion-label>Use True North</ion-label>
-          <ion-toggle :checked="compassMode === 'true'" @ionChange="onCompassToggle" aria-label="Toggle heading reference" />
+          <ion-toggle :checked="compassMode === 'true'" @ionChange="onCompassToggle" />
         </ion-item>
       </ion-list>
     </ion-content>

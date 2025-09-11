@@ -92,6 +92,14 @@ MSG
     MSG
     ```
 
+## Accessibility
+
+- Prefer visible, descriptive text for controls. Do not add `aria-label` when a control already has a clear text label; `aria-label` overrides the accessible name and can diverge from the visible label.
+- Use `aria-label` only when there is no visible text (e.g., icon-only buttons) or when additional clarification is required for assistive tech. Keep it short and consistent with the visual purpose.
+- If a nearby text node is the label, prefer `aria-labelledby` referencing that text rather than duplicating with `aria-label`.
+- Keep the accessible name in sync with the UI. Avoid mismatches like a button that visually reads “Compass (True)” but announces a different label.
+- Do not duplicate the visible text with `aria-label`; it’s redundant and may confuse screen readers. Let the visible text be the accessible name by default.
+
 ### Testing TODOs
 
 - Use `testing_plan.md` as the canonical checklist for unit tests.

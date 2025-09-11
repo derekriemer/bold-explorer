@@ -30,8 +30,9 @@ const routes: RouteRecordRaw[] = [
                 replace: true
               } as any;
             }
-          } catch (_) {
-            // Ignore and allow navigation; page will auto-fetch if needed
+          } catch (e) {
+            // Geolocation may fail; allow navigation and page will auto-fetch if needed
+            console.warn('[router] getCurrentPosition failed', e);
           }
           return true;
         }

@@ -4,9 +4,9 @@
       <ion-toolbar>
         <ion-title>Waypoints</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click=" onImport " aria-label="Import GPX">Import</ion-button>
-          <ion-button @click=" onExport " aria-label="Export selected">Export</ion-button>
-          <ion-button color="primary" @click=" onAdd " aria-label="Add waypoint">Add</ion-button>
+          <ion-button @click=" onImport ">Import</ion-button>
+          <ion-button @click=" onExport ">Export</ion-button>
+          <ion-button color="primary" @click=" onAdd ">Add</ion-button>
         </ion-buttons>
         <PageHeaderToolbar />
       </ion-toolbar>
@@ -16,7 +16,7 @@
       <ion-toolbar>
         <ion-item lines="none">
           <ion-label>Live Location Updates</ion-label>
-          <ion-toggle v-model=" liveUpdates " @ionChange=" onToggleLive " aria-label="Toggle live location updates" />
+          <ion-toggle v-model=" liveUpdates " @ionChange=" onToggleLive " />
         </ion-item>
       </ion-toolbar>
     </ion-header>
@@ -34,23 +34,18 @@
               </p>
             </ion-label>
             <ion-buttons slot="end">
-              <ion-button size="small" fill="clear" color="medium" @click.stop="onRename(wp.id as number, wp.name)"
-                aria-label="Edit waypoint">
+              <ion-button size="small" fill="clear" color="medium" @click.stop="onRename(wp.id as number, wp.name)">
                 Edit
               </ion-button>
-              <ion-button size="small" fill="clear" color="danger" @click.stop="onDelete(wp.id as number)"
-                aria-label="Delete waypoint">
+              <ion-button size="small" fill="clear" color="danger" @click.stop="onDelete(wp.id as number)">
                 Delete
               </ion-button>
             </ion-buttons>
           </ion-item>
           <ion-item-options side="end">
-            <ion-item-option color="medium" @click="onAttach(wp.id as number)"
-              aria-label="Attach to trail">Attach</ion-item-option>
-            <ion-item-option color="tertiary" @click="onRename(wp.id as number, wp.name)"
-              aria-label="Rename waypoint">Rename</ion-item-option>
-            <ion-item-option color="danger" @click="onDelete(wp.id as number)"
-              aria-label="Delete waypoint">Delete</ion-item-option>
+            <ion-item-option color="medium" @click="onAttach(wp.id as number)">Attach</ion-item-option>
+            <ion-item-option color="tertiary" @click="onRename(wp.id as number, wp.name)">Rename</ion-item-option>
+            <ion-item-option color="danger" @click="onDelete(wp.id as number)">Delete</ion-item-option>
           </ion-item-options>
         </ion-item-sliding>
       </ion-list>
@@ -98,7 +93,6 @@ import { useGeolocation } from '@/composables/useGeolocation';
 import { formatDistance as fmtDistance } from '@/composables/useDistance';
 import { usePrefsStore } from '@/stores/usePrefs';
 import { parseCenterParam } from '@/utils/locationParam';
-import { Geolocation } from '@capacitor/geolocation';
 import { useActions } from '@/composables/useActions';
 import type { Waypoint } from '@/db/schema';
 import { actionsService } from '@/services/actions.service';

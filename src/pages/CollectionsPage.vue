@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-title>Collections</ion-title>
         <ion-buttons slot="end">
-          <ion-button color="primary" @click="onAdd" aria-label="Add collection">Add</ion-button>
+          <ion-button color="primary" @click="onAdd">Add</ion-button>
         </ion-buttons>
         <PageHeaderToolbar />
       </ion-toolbar>
@@ -12,8 +12,7 @@
     <ion-content>
       <ion-list inset>
         <template v-if="collections.list.length > 0">
-          <ion-item v-for="c in collections.list" :key="c.id" button :detail="true" @click="toggleOpen(c.id as number)"
-            :aria-label="`Open collection ${c.name}`">
+          <ion-item v-for="c in collections.list" :key="c.id" button :detail="true" @click="toggleOpen(c.id as number)">
             <ion-label>
               <h2>{{ c.name }}</h2>
               <p v-if="c.description">{{ c.description }}</p>
@@ -32,7 +31,7 @@
           </ion-card-header>
           <ion-card-content>
             <div class="section-actions">
-              <ion-button size="small" fill="outline" @click="onExport(c.id as number)" aria-label="Export collection">Export GPX</ion-button>
+              <ion-button size="small" fill="outline" @click="onExport(c.id as number)">Export GPX</ion-button>
             </div>
             <h3>Waypoints</h3>
             <ion-list>
@@ -44,7 +43,7 @@
                   </div>
                 </ion-label>
                 <ion-button size="small" fill="clear" color="danger"
-                  @click="removeWp(c.id as number, w.id as number)" aria-label="Remove waypoint from collection">
+                  @click="removeWp(c.id as number, w.id as number)">
                   Remove
                 </ion-button>
               </ion-item>
@@ -63,7 +62,7 @@
                   </div>
                 </ion-label>
                 <ion-button size="small" fill="clear" color="danger"
-                  @click="removeTrail(c.id as number, t.id as number)" aria-label="Remove trail from collection">
+                  @click="removeTrail(c.id as number, t.id as number)">
                   Remove
                 </ion-button>
               </ion-item>

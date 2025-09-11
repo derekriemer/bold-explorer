@@ -1,4 +1,4 @@
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import CapacitorSQLiteKyselyDialect from 'capacitor-sqlite-kysely';
 import { SQLiteConnection, CapacitorSQLite } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
@@ -30,8 +30,20 @@ export async function createAppDb() {
 }
 
 export async function createTestDb() {
-  const SQLite = (await import('better-sqlite3')).default as any;
-  const dialect = new SqliteDialect({ database: new SQLite(':memory:') });
+  // Use the Capacitor SQLite dialect backed by jeep-sqlite in web/JSDOM.
+  // Create a unique, ephemeral database name per invocation.
+  // On native, this still creates a temporary DB file under app data.
+  if (Capacitor.getPlatform() === 'web') {
+    try {
+      await CapacitorSQLite.initWebStore();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('CapacitorSQLite.initWebStore (test) failed or not available:', e);
+    }
+  }
+  const sqlite = new SQLiteConnection(CapacitorSQLite);
+  const name = `test_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const dialect = new CapacitorSQLiteKyselyDialect(sqlite, { name });
   const db = new Kysely<DB>({ dialect });
   await migrate(db);
   return db;

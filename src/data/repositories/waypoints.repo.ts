@@ -6,12 +6,6 @@ import type { LatLng } from '@/types/latlng';
 
 // Degrees-to-radians conversion factor (1° = PI/180 radians)
 const DEG_TO_RAD = Math.PI / 180;
-// Mean meters per degree of latitude at Earth's surface (~111.32 km)
-const METERS_PER_DEG_LAT = 111_320;
-// Default bounding-box radius for candidate selection (~50 km)
-const DEFAULT_BBOX_RADIUS_M = 50_000;
-// Cosine threshold to consider we're effectively at the pole (skip lon filtering). EPS=EPSILON
-const EPS_COS_LAT_POLE = 1e-6;
 
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}

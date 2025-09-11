@@ -18,36 +18,32 @@
             <ion-list inset>
               <ion-item>
                 <ion-label>Enable High Accuracy</ion-label>
-                <ion-toggle v-model="optEnableHighAccuracy" aria-label="Toggle enableHighAccuracy" />
+                <ion-toggle v-model=" optEnableHighAccuracy " />
               </ion-item>
               <ion-item>
                 <ion-label>Maximum Age (ms)</ion-label>
-                <ion-input type="number" inputmode="numeric" v-model.number="optMaximumAge" placeholder="0"
-                  aria-label="maximumAge in ms" />
+                <ion-input type="number" inputmode="numeric" v-model.number=" optMaximumAge " placeholder="0" />
               </ion-item>
               <ion-item>
                 <ion-label>Timeout (ms)</ion-label>
-                <ion-input type="number" inputmode="numeric" v-model.number="optTimeout" placeholder="30000"
-                  aria-label="timeout in ms" />
+                <ion-input type="number" inputmode="numeric" v-model.number=" optTimeout " placeholder="30000" />
               </ion-item>
               <ion-item>
                 <ion-label>Target Accuracy (m)</ion-label>
-                <ion-input type="number" inputmode="numeric" v-model.number="minAccuracyM" placeholder="10"
-                  aria-label="min accuracy meters" />
+                <ion-input type="number" inputmode="numeric" v-model.number=" minAccuracyM " placeholder="10" />
               </ion-item>
               <ion-item>
                 <ion-label>Settle Window (ms)</ion-label>
-                <ion-input type="number" inputmode="numeric" v-model.number="settleMs" placeholder="15000"
-                  aria-label="settle ms" />
+                <ion-input type="number" inputmode="numeric" v-model.number=" settleMs " placeholder="15000" />
               </ion-item>
             </ion-list>
 
             <div class="actions">
-              <ion-button color="primary" :disabled="!dirty" @click="restartWatch" aria-label="Restart watch with updated options">
+              <ion-button color="primary" :disabled=" !dirty " @click=" restartWatch ">
                 Restart Watch
               </ion-button>
-              <ion-button color="medium" fill="outline" @click="stopWatch" :disabled="!watching" aria-label="Stop watch">Stop</ion-button>
-              <ion-button fill="clear" size="small" @click="applyDefaults" aria-label="Reset to defaults">Reset Defaults</ion-button>
+              <ion-button color="medium" fill="outline" @click=" stopWatch " :disabled=" !watching ">Stop</ion-button>
+              <ion-button fill="clear" size="small" @click=" applyDefaults ">Reset Defaults</ion-button>
               <span class="hint" v-if="dirty">Unsaved changes</span>
             </div>
           </ion-card-content>
@@ -81,7 +77,7 @@
               </div>
             </div>
             <div class="controls">
-              <ion-button @click=" recenter " aria-label="Recenter or calibrate">Recenter/Calibrate</ion-button>
+              <ion-button @click=" recenter ">Recenter/Calibrate</ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -91,7 +87,7 @@
             <ion-card-title>Data Diagnostics</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <ion-button fill="outline" size="small" @click=" runDiagnostics " aria-label="Run diagnostics">Run Diagnostics</ion-button>
+            <ion-button fill="outline" size="small" @click=" runDiagnostics ">Run Diagnostics</ion-button>
             <div class="debug-grid" v-if="diag">
               <div><span class="k">Repos installed:</span> <span class="v">{{ diag?.repos ?? '—' }}</span></div>
               <div><span class="k">Query OK:</span> <span class="v">{{ diag?.queryOk ?? '—' }}</span></div>
@@ -109,7 +105,8 @@
           <ion-card-content>
             <div class="settle-grid">
               <div><span class="k">Watching:</span> <span class="v">{{ watching }}</span></div>
-              <div><span class="k">Target ≤:</span> <span class="v">{{ minAccuracyM }} m ({{ (minAccuracyM*3.28084).toFixed(0) }} ft)</span></div>
+              <div><span class="k">Target ≤:</span> <span class="v">{{ minAccuracyM }} m ({{
+                (minAccuracyM * 3.28084).toFixed(0) }} ft)</span></div>
               <div><span class="k">Current acc:</span> <span class="v">{{ curAccText }}</span></div>
               <div><span class="k">Best acc:</span> <span class="v">{{ bestAccText }}</span></div>
               <div><span class="k">Fixes seen:</span> <span class="v">{{ fixCount }}</span></div>
@@ -122,15 +119,16 @@
       </div>
     </ion-content>
   </ion-page>
-  
+
 </template>
 <script setup lang="ts">
-import {
+import
+{
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonBackButton, IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonList, IonItem, IonLabel, IonInput, IonToggle
 } from '@ionic/vue';
-import { ref, computed, onMounted, onBeforeUnmount, watch, reactive } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Capacitor } from '@capacitor/core';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useGeolocation } from '@/composables/useGeolocation';
@@ -150,7 +148,8 @@ const headingTrue = ref<number | null>(null);
 let removeHeadingListener: (() => void) | null = null;
 
 // Magnetic declination (true - magnetic), normalized to [-180, 180]
-const declinationDeg = computed(() => {
+const declinationDeg = computed(() =>
+{
   if (headingMag.value == null || headingTrue.value == null) return null;
   let d = headingTrue.value - headingMag.value;
   d = ((d + 180) % 360 + 360) % 360 - 180;
@@ -165,12 +164,13 @@ const minAccuracyM = ref<number>(10);
 const settleMs = ref<number>(15000);
 const optEnableHighAccuracy = ref<boolean>(true);
 const optMaximumAge = ref<number>(0);
-const optTimeout = ref<number>(30000);
+const optTimeout = ref<number>(45000);
 
 type Applied = { minAccuracyM: number; settleMs: number; options: { enableHighAccuracy: boolean; maximumAge: number; timeout: number } };
 const lastApplied = ref<Applied | null>(null);
 const lastStartAt = ref<number | null>(null);
-const dirty = computed(() => {
+const dirty = computed(() =>
+{
   const applied = lastApplied.value;
   if (!applied) return true;
   return (
@@ -188,22 +188,27 @@ const bestCount = ref(0);
 let lastCurrentTs: number | null = null;
 let lastBestTs: number | null = null;
 
-watch(gps, (g) => {
+watch(gps, (g) =>
+{
   if (!g) return;
-  if (g.ts != null && g.ts !== lastCurrentTs) {
+  if (g.ts != null && g.ts !== lastCurrentTs)
+  {
     fixCount.value += 1;
     lastCurrentTs = g.ts ?? Date.now();
   }
 });
-watch(best, (b) => {
+watch(best, (b) =>
+{
   if (!b) return;
-  if (b.ts != null && b.ts !== lastBestTs) {
+  if (b.ts != null && b.ts !== lastBestTs)
+  {
     bestCount.value += 1;
     lastBestTs = b.ts ?? Date.now();
   }
 });
 
-function getApplied(): Applied {
+function getApplied (): Applied
+{
   return {
     minAccuracyM: minAccuracyM.value,
     settleMs: settleMs.value,
@@ -215,7 +220,8 @@ function getApplied(): Applied {
   };
 }
 
-async function restartWatch() {
+async function restartWatch ()
+{
   await stop();
   const cfg = getApplied();
   await start({ minAccuracyM: cfg.minAccuracyM, settleMs: cfg.settleMs, options: cfg.options });
@@ -225,11 +231,13 @@ async function restartWatch() {
   bestCount.value = 0;
 }
 
-async function stopWatch() {
+async function stopWatch ()
+{
   await stop();
 }
 
-function applyDefaults() {
+function applyDefaults ()
+{
   minAccuracyM.value = 10;
   settleMs.value = 15000;
   optEnableHighAccuracy.value = true;
@@ -237,32 +245,38 @@ function applyDefaults() {
   optTimeout.value = 30000;
 }
 
-const curAccText = computed(() => {
+const curAccText = computed(() =>
+{
   const a = gps.value?.accuracy;
   return a != null ? `${ a.toFixed(0) } m (${ m2ft(a)?.toFixed(0) } ft)` : '—';
 });
-const bestAccText = computed(() => {
+const bestAccText = computed(() =>
+{
   const a = best.value?.accuracy;
   return a != null ? `${ a.toFixed(0) } m (${ m2ft(a)?.toFixed(0) } ft)` : '—';
 });
 
-const reachedTarget = computed(() => {
+const reachedTarget = computed(() =>
+{
   const a = gps.value?.accuracy;
   return a != null && a <= minAccuracyM.value;
 });
 
-const countdownText = computed(() => {
+const countdownText = computed(() =>
+{
   if (!lastStartAt.value) return '—';
   const remain = Math.max(0, (lastStartAt.value + settleMs.value) - Date.now());
   const s = Math.ceil(remain / 100) / 10; // tenths
   return `${ s.toFixed(1) }s`;
 });
 
-const settleReason = computed(() => {
+const settleReason = computed(() =>
+{
   if (reachedTarget.value) return 'target achieved';
   if (!lastStartAt.value) return '—';
   const expired = Date.now() >= (lastStartAt.value + settleMs.value);
-  if (expired) {
+  if (expired)
+  {
     const isBest = gps.value?.ts != null && best.value?.ts != null && gps.value.ts === best.value.ts;
     return isBest ? 'deadline best' : 'deadline pending';
   }
@@ -314,12 +328,14 @@ async function runDiagnostics ()
 onMounted(async () =>
 {
   // Start watch immediately with current UI config
-  try {
+  try
+  {
     const ok = await ensurePermissions();
-    if (ok) {
+    if (ok)
+    {
       await restartWatch();
     }
-  } catch {}
+  } catch (e) { console.warn('[DebugPage] ensurePermissions/restartWatch failed', e); }
   if (!isWeb)
   {
     try
@@ -333,7 +349,8 @@ onMounted(async () =>
       });
       await Heading.start({ useTrueNorth: true });
       removeHeadingListener = () => { sub.remove(); void Heading.stop(); };
-    } catch (e) {
+    } catch (e)
+    {
       console.error('[Heading] init error', e);
     }
   }
@@ -341,7 +358,7 @@ onMounted(async () =>
 
 onBeforeUnmount(() =>
 {
-  try { removeHeadingListener?.(); } catch {}
+  try { removeHeadingListener?.(); } catch (e) { console.warn('[DebugPage] removeHeadingListener failed', e); }
   removeHeadingListener = null;
 });
 </script>
@@ -390,6 +407,7 @@ onBeforeUnmount(() =>
   gap: 8px;
   margin-top: 8px;
 }
+
 .actions .hint {
   color: var(--ion-color-warning);
   font-size: 0.9rem;
@@ -402,5 +420,4 @@ onBeforeUnmount(() =>
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 12px;
 }
-
 </style>

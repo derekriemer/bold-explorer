@@ -1,5 +1,4 @@
 import type { Kysely, Selectable } from 'kysely';
-import { sql } from 'kysely';
 import type { DB, Trail } from '@/db/schema';
 
 export class TrailsRepo {

@@ -7,10 +7,10 @@
       </ion-toolbar>
       <ion-toolbar>
         <ion-segment v-model=" scope " aria-label="Selection scope">
-          <ion-segment-button value="waypoint" aria-label="Waypoint scope">
+          <ion-segment-button value="waypoint">
             <ion-label>Waypoint</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="trail" aria-label="Trail scope">
+          <ion-segment-button value="trail">
             <ion-label>Trail</ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -20,19 +20,18 @@
       <div class="ion-padding">
         <ion-item v-if="scope === 'waypoint'">
           <ion-label>Waypoint</ion-label>
-          <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected"
-            aria-label="Select waypoint">
+          <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected">
             <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
             }}</ion-select-option>
           </ion-select>
-          <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null" @click=" clearWaypoint "
-            aria-label="Clear selected waypoint">Clear</ion-button>
+          <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null"
+            @click=" clearWaypoint ">Clear</ion-button>
         </ion-item>
 
         <template v-else>
           <ion-item>
             <ion-label>Trail</ion-label>
-            <ion-select v-model=" selectedTrailId " interface="popover" aria-label="Select trail">
+            <ion-select v-model=" selectedTrailId " interface="popover">
               <ion-select-option v-for="t in trails.list" :key=" t.id " :value=" t.id ">{{ t.name }}</ion-select-option>
             </ion-select>
           </ion-item>
@@ -41,8 +40,7 @@
               <div>Current: {{ active && next ? currentIndex + 1 : '-' }}</div>
               <div>Next: {{ next?.name ?? '-' }}</div>
             </ion-label>
-            <ion-button fill="outline" size="small" @click=" toggleFollow "
-              :aria-label=" active ? 'Stop following' : 'Start following' ">
+            <ion-button fill="outline" size="small" @click=" toggleFollow ">
               {{ active ? 'Stop' : 'Start' }}
             </ion-button>
           </ion-item>
@@ -52,7 +50,11 @@
           <ion-card-content>
             <div class="telemetry">
               <div v-if="!isWeb" class="telemetry-item">
-                <div class="label">{{ compassLabel }}</div>
+                <div class="label">
+                  <ion-button fill="clear" size="small" class="compass-toggle" @click=" toggleCompassMode ">
+                    {{ compassLabel }}
+                  </ion-button>
+                </div>
                 <div class="value">{{ compassText }}</div>
               </div>
               <div v-if="targetCoord" class="telemetry-item">
@@ -68,14 +70,10 @@
         </ion-card>
 
         <PositionReadout :lat=" gps?.lat ?? null " :lon=" gps?.lon ?? null " :elev_m=" gps?.altitude ?? null "
-          :accuracy=" gps?.accuracy ?? null " :units=" units " />
+          :accuracy=" gps?.accuracy ?? null " :units=" prefs.units " />
 
         <div class="controls">
-          <ion-button @click=" recenter " aria-label="Recenter or calibrate">Recenter/Calibrate</ion-button>
-          <ion-item lines="none" :button=" true " :detail=" false " @click=" toggleCompassMode ">
-            <ion-label>Compass heading: {{ compassMode === 'true' ? 'True' : 'Magnetic' }}</ion-label>
-          </ion-item>
-
+          <ion-button @click=" recenter ">Recenter/Calibrate</ion-button>
         </div>
 
         <div class="sr-only" aria-live="polite">{{ announcement }}</div>
@@ -119,16 +117,13 @@ const waypointsAll = computed(() => wps.all);
 const selectedWaypointId = ref<number | null>(null);
 const selectedTrailId = ref<number | null>(null);
 
-const { current: gps, start: startGps, recenter: recenterGps, ensurePermissions, autoStartOnMounted } = useGeolocation();
+const { current: gps, recenter: recenterGps, autoStartOnMounted } = useGeolocation();
 
 const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
   useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
 
 const prefs = usePrefsStore();
-const units = computed(() => prefs.units);
-const compassMode = computed(() => prefs.compassMode);
-// Audio cues moved to Settings page
 const actions = useActions();
 
 const isWeb = Capacitor.getPlatform() === 'web';
@@ -165,18 +160,9 @@ const bearingDisplay = computed(() => bearingDeg.value != null ? `${ bearingDeg.
 // Heading used for compass display, from native plugin when available
 const compassHeadingDeg = computed(() =>
 {
-  if (compassMode.value === 'true') return headingTrue.value ?? headingMag.value;
-  return headingMag.value ?? headingTrue.value;
+  if (prefs.compassMode === 'true') return headingTrue.value;
+  return headingMag.value;
 });
-// Magnetic declination (true - magnetic), normalized to [-180, 180]
-const declinationDeg = computed(() =>
-{
-  if (headingMag.value == null || headingTrue.value == null) return null;
-  let d = headingTrue.value - headingMag.value;
-  d = ((d + 180) % 360 + 360) % 360 - 180;
-  return d;
-});
-const declinationText = computed(() => declinationDeg.value != null ? `${ declinationDeg.value.toFixed(1) }°` : '—');
 const targetName = computed(() =>
 {
   if (scope.value === 'waypoint')
@@ -199,12 +185,12 @@ const compassText = computed(() =>
   const idx = Math.round(h / 22.5) % 16;
   return `${ dirs[idx] } ${ h.toFixed(0) }°`;
 });
-const compassLabel = computed(() => `Compass (${ compassMode.value === 'true' ? 'True' : 'Magnetic' })`);
+const compassLabel = computed(() => `Compass: (${ prefs.compassMode.toLocaleUpperCase() }) North`);
 // Distance formatting inline (feet/miles thresholds: 5280 ft = 1 mi)
 const distanceDisplay = computed(() =>
 {
   if (distanceM.value == null) return '—';
-  if (units.value === 'imperial')
+  if (prefs.units === 'imperial')
   {
     const feet = distanceM.value * 3.28084; // meters → feet
     return feet >= 528 ? `${ (feet / 5280).toFixed(2) } mi` : `${ feet.toFixed(0) } ft`;
@@ -236,11 +222,10 @@ function clearWaypoint ()
 
 async function toggleCompassMode ()
 {
-  const next = compassMode.value === 'true' ? 'magnetic' : 'true';
+  const next = prefs.compassMode === 'true' ? 'magnetic' : 'true';
   await prefs.setCompassMode(next);
 }
 
-// Audio cues toggle moved to Settings page
 
 async function markWaypoint ()
 {
@@ -314,7 +299,8 @@ autoStartOnMounted({
 
 onBeforeUnmount(() =>
 {
-  try { removeHeadingListener?.(); } catch { }
+  try { removeHeadingListener?.(); }
+  catch (e) { console.warn('[GpsPage] removeHeadingListener failed', e); }
   removeHeadingListener = null;
 });
 
@@ -334,7 +320,8 @@ watch(gps, async (pos) =>
   {
     console.info('[Heading] setLocation ->', pos.lat, pos.lon, pos.altitude ?? undefined);
     await Heading.setLocation?.({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
-  } catch { /* ignore */ }
+  }
+  catch (e) { console.warn('[Heading] setLocation error', e); }
 });
 </script>
 <style scoped>
@@ -373,5 +360,14 @@ watch(gps, async (pos) =>
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
+}
+
+.compass-toggle {
+  --padding-start: 0;
+  --padding-end: 0;
+  --min-height: auto;
+  height: auto;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
 }
 </style>

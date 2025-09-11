@@ -9,6 +9,14 @@ const RAD = Math.PI / 180;
 // Mean Earth radius in meters (spherical approximation)
 export const EARTH_R = 6_371_000;
 
+/**
+ * Compute great‑circle distance between two lat/lon points using the haversine formula.
+ *
+ * - Inputs are degrees. Internally converts to radians.
+ * - Uses a spherical Earth model with mean radius EARTH_R. For sub‑10 km distances this is a
+ *   good approximation for most applications.
+ * - Returns meters.
+ */
 export function haversineDistanceMeters(a: LatLng, b: LatLng): number {
   const R = 6371000;
   const dLat = (b.lat - a.lat) * RAD;

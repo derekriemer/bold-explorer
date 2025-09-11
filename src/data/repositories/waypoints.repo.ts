@@ -10,7 +10,7 @@ const DEG_TO_RAD = Math.PI / 180;
 const METERS_PER_DEG_LAT = 111_320;
 // Default bounding-box radius for candidate selection (~50 km)
 const DEFAULT_BBOX_RADIUS_M = 50_000;
-// Cosine threshold to consider we're effectively at the pole (skip lon filtering)
+// Cosine threshold to consider we're effectively at the pole (skip lon filtering). EPS=EPSILON
 const EPS_COS_LAT_POLE = 1e-6;
 
 export class WaypointsRepo {
@@ -187,6 +187,30 @@ export class WaypointsRepo {
     return opts?.limit ? nearby.slice(0, opts.limit) : nearby;
   }
 
+  /**
+   * Fetch waypoints ordered by distance from a given center using a portable, index‑friendly algorithm.
+   *
+   * Algorithm (portable across SQLite builds that lack trig functions):
+   * 1) Compute a geographic bounding box (bbox) around `center` for a default radius (~50 km).
+   *    - Convert meters → degrees using METERS_PER_DEG_LAT and cos(latitude) for longitude span.
+   *    - Clamp latitude to [-90, 90].
+   *    - Longitude handling:
+   *       • If near the poles (|cos(lat)| < EPS_COS_LAT_POLE) or span ≥ 180°, skip lon filter entirely.
+   *       • If the bbox crosses the anti‑meridian, express lon filter as (lon >= min OR lon <= max).
+   * 2) Run a SQL query constrained by the bbox using the composite index (idx_waypoint_lat_lon).
+   *    - Apply a coarse ORDER BY: |lat - centerLat|, then cyclic |lon - centerLon| to bring nearest candidates first.
+   *    - Limit the candidate count (e.g., ~3× requested limit) to reduce JS work.
+   * 3) In JS, compute exact great‑circle distances (haversine) for the candidates, sort ascending, and slice to `limit`.
+   *
+   * Rationale: SQLite on native/web often lacks trig functions; computing exact distances in JS guarantees
+   * consistency. The bbox + coarse sort keep the candidate set small and ordered, so the final JS sort is cheap.
+   *
+   * Complexity: O(log N + K log K), where N is total waypoints and K is candidate count (typically small).
+   *
+   * @param center Geographic center (degrees) to measure distance from.
+   * @param opts Optional filters: `trailId` to restrict to a trail; `limit` for max results (post‑sort).
+   * @returns Array of waypoints augmented with `distance_m` (meters), ordered nearest first.
+   */
   async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
     // Bounding box in degrees for ~50 km radius (adjustable if needed)
     const radiusM = DEFAULT_BBOX_RADIUS_M;

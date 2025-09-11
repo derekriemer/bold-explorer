@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createTestDb } from '@/db/factory';
+import { webDbAvailable } from './fixtures/test-db';
 import { TrailsRepo } from '@/data/repositories/trails.repo';
 import { WaypointsRepo } from '@/data/repositories/waypoints.repo';
 
-// Temporarily disabled due to better-sqlite3 native binding constraints in sandbox/CI
-describe.skip('TrailsRepo', () => {
+describe.skipIf(!webDbAvailable())('TrailsRepo', () => {
   it('creates and removes trail with cascade', async () => {
     const db = await createTestDb();
     const trails = new TrailsRepo(db);

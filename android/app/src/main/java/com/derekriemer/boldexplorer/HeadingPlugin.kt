@@ -49,7 +49,7 @@ class HeadingPlugin : Plugin(), SensorEventListener {
   }
 
   @PluginMethod
-  fun start(call: PluginCall) {
+  fun start(call: PluginCall)   {
     useTrue = call.getBoolean("useTrueNorth", false) ?: false
     val a = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     val m = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)

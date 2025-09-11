@@ -1,18 +1,15 @@
-import { Kysely, SqliteDialect } from 'kysely';
+import type { Kysely } from 'kysely';
 import type { DB } from '@/db/schema';
-import { createMigrator } from '@/db/migrations/provider';
+import { createTestDb } from '@/db/factory';
 
-// Controls whether DB-backed tests run. In constrained sandboxes, native
-// better-sqlite3 may be unavailable. Set DB_NATIVE=1 to enable these tests.
-export const DB_NATIVE_ENABLED = process.env.DB_NATIVE === '1';
+// Enable DB-backed tests only when required web storage APIs exist.
+// jeep-sqlite on web needs IndexedDB/localForage.
+export function webDbAvailable() {
+  return typeof (globalThis as any).indexedDB !== 'undefined';
+}
 
 export async function createInMemoryDb(): Promise<Kysely<DB>> {
-  const SQLite = (await import('better-sqlite3')).default as any;
-  const dialect = new SqliteDialect({ database: new SQLite(':memory:') });
-  const db = new Kysely<DB>({ dialect });
-  const migrator = createMigrator(db);
-  await migrator.migrateToLatest();
-  return db;
+  return createTestDb();
 }
 
 // Defines a per-test lifecycle for an in-memory DB.
@@ -34,4 +31,3 @@ export function defineDbLifecycle() {
     return db;
   };
 }
-

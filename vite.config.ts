@@ -30,6 +30,7 @@ export default defineConfig(({ command }) => ({
   },
   test: {
     globals: true,
-    environment: 'jsdom'
+    environment: 'jsdom',
+    setupFiles: ['tests/setup/jeep-sqlite.ts']
   }
 }))

@@ -22,7 +22,7 @@
           <ion-label>Waypoint</ion-label>
           <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected">
             <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
-            }}</ion-select-option>
+              }}</ion-select-option>
           </ion-select>
           <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null"
             @click=" clearWaypoint ">Clear</ion-button>
@@ -35,6 +35,17 @@
               <ion-select-option v-for="t in trails.list" :key=" t.id " :value=" t.id ">{{ t.name }}</ion-select-option>
             </ion-select>
           </ion-item>
+          <ion-card v-if="!selectedTrailId" class="ion-margin-top">
+            <ion-card-content>
+              <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px;">
+                <div>
+                  <div style="font-weight:600; margin-bottom:4px;">Start a new trail</div>
+                  <div style="color: var(--ion-color-medium);">Record waypoints as you move. The + button adds points to this trail.</div>
+                </div>
+                <ion-button color="primary" @click=" recordNewTrail ">Record New Trail</ion-button>
+              </div>
+            </ion-card-content>
+          </ion-card>
           <ion-item v-if="selectedTrailId">
             <ion-label>
               <div>Current: {{ active && next ? currentIndex + 1 : '-' }}</div>
@@ -185,7 +196,7 @@ const compassText = computed(() =>
   const idx = Math.round(h / 22.5) % 16;
   return `${ dirs[idx] } ${ h.toFixed(0) }°`;
 });
-const compassLabel = computed(() => `Compass: (${ prefs.compassMode.toLocaleUpperCase() }) North`);
+const compassLabel = computed(() => `Compass: ${ prefs.compassMode.toLocaleUpperCase() } North`);
 // Distance formatting inline (feet/miles thresholds: 5280 ft = 1 mi)
 const distanceDisplay = computed(() =>
 {
@@ -218,6 +229,15 @@ async function recenter ()
 function clearWaypoint ()
 {
   selectedWaypointId.value = null;
+}
+
+async function recordNewTrail ()
+{
+  const ts = new Date();
+  const name = `Trail ${ ts.toLocaleDateString() } ${ ts.toLocaleTimeString() }`;
+  const id = await trails.create({ name, description: null });
+  selectedTrailId.value = id;
+  actions.show('New trail ready. Tap + to record waypoints.', { kind: 'success' });
 }
 
 async function toggleCompassMode ()

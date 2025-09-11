@@ -29,6 +29,25 @@ describe.skipIf(!webDbAvailable())('utils.fetchWaypointsWithDistance', () => {
     expect(names).toEqual(['east', 'west']);
   });
 
+  it('works at equator/prime meridian (0°,0°)', async () => {
+    const db = getDb();
+    const now = new Date().toISOString();
+    // Place points N/E/S/W around the origin at varying distances
+    await db.insertInto('waypoint').values({ name: 'N', lat: 0.05, lon: 0, elev_m: null, description: null, created_at: now }).execute();
+    await db.insertInto('waypoint').values({ name: 'E', lat: 0, lon: 0.05, elev_m: null, description: null, created_at: now }).execute();
+    await db.insertInto('waypoint').values({ name: 'S', lat: -0.10, lon: 0, elev_m: null, description: null, created_at: now }).execute();
+    await db.insertInto('waypoint').values({ name: 'W', lat: 0, lon: -0.10, elev_m: null, description: null, created_at: now }).execute();
+
+    const res = await fetchWaypointsWithDistance(db as any, { lat: 0, lon: 0 }, { limit: 3 });
+    const names = res.map(r => r.name);
+    // First two should be the closest (N/E in any order), third one of S/W
+    const firstTwo = new Set(names.slice(0, 2));
+    expect(firstTwo).toEqual(new Set(['N', 'E']));
+    expect(['S', 'W']).toContain(names[2]);
+    expect(res[0].distance_m).toBeLessThanOrEqual(res[1].distance_m);
+    expect(res[1].distance_m).toBeLessThan(res[2].distance_m);
+  });
+
   it('skips longitude filter near poles (lat 89.9) and still sorts by true distance', async () => {
     const db = getDb();
     await db.insertInto('waypoint').values({ name: 'near1', lat: 89.95, lon: 0, elev_m: null, description: null, created_at: new Date().toISOString() }).execute();

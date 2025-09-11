@@ -23,11 +23,13 @@ const props = defineProps<{ lat: number | null | undefined; lon: number | null |
 function formatLat(v?: number | null) { return v == null ? '—' : v.toFixed(6); }
 function formatLon(v?: number | null) { return v == null ? '—' : v.toFixed(6); }
 
+// 1 meter ≈ 3.28084 feet
 const elevationDisplay = computed(() => {
   if (props.elev_m == null) return '—';
   return props.units === 'imperial' ? `${(props.elev_m * 3.28084).toFixed(0)} ft` : `${props.elev_m.toFixed(0)} m`;
 });
 
+// 1 meter ≈ 3.28084 feet
 const accuracyDisplay = computed(() => {
   if (props.accuracy == null) return '—';
   return props.units === 'imperial' ? `${(props.accuracy * 3.28084).toFixed(0)} ft` : `${props.accuracy.toFixed(0)} m`;
@@ -39,4 +41,3 @@ const accuracyDisplay = computed(() => {
 .label { color: var(--ion-color-medium); font-size: 0.85rem; }
 .value { font-size: 1.1rem; font-weight: 600; }
 </style>
-

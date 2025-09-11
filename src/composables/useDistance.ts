@@ -3,6 +3,7 @@ import { haversineDistanceMeters } from '@/utils/geo';
 
 export type Units = 'metric' | 'imperial';
 
+// 1 meter = ~3.28084 feet; 1 mile = 5280 feet
 export function formatDistance(distanceM: number | null, units: Units): string {
   if (distanceM == null) return '—';
   if (units === 'imperial') {
@@ -24,4 +25,3 @@ export function useDistance(position: Ref<{ lat: number; lon: number } | null>, 
 
   return { distanceTo, sorterFrom, format, units: computed(() => units.value) };
 }
-

@@ -4,9 +4,14 @@ import type { DB, Waypoint } from '@/db/schema';
 import { sqlDistanceMetersForAlias, fetchWaypointsWithDistance, haversineDistanceMeters } from '@/utils/geo';
 import type { LatLng } from '@/types/latlng';
 
-// Degrees-to-radians conversion factor
-// 1 degree = PI / 180 radians
+// Degrees-to-radians conversion factor (1° = PI/180 radians)
 const DEG_TO_RAD = Math.PI / 180;
+// Mean meters per degree of latitude at Earth's surface (~111.32 km)
+const METERS_PER_DEG_LAT = 111_320;
+// Default bounding-box radius for candidate selection (~50 km)
+const DEFAULT_BBOX_RADIUS_M = 50_000;
+// Cosine threshold to consider we're effectively at the pole (skip lon filtering)
+const EPS_COS_LAT_POLE = 1e-6;
 
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}
@@ -183,9 +188,9 @@ export class WaypointsRepo {
   }
 
   async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
-    // Bounding box in degrees for ~50km radius (adjustable if needed)
-    const radiusM = 50000;
-    const degLat = radiusM / 111320;
+    // Bounding box in degrees for ~50 km radius (adjustable if needed)
+    const radiusM = DEFAULT_BBOX_RADIUS_M;
+    const degLat = radiusM / METERS_PER_DEG_LAT;
     const latMin = Math.max(-90, center.lat - degLat);
     const latMax = Math.min(90, center.lat + degLat);
 
@@ -194,11 +199,11 @@ export class WaypointsRepo {
     let crossing = false;
     let lonMin = -180;
     let lonMax = 180;
-    if (Math.abs(cosLat) < 1e-6) {
+    if (Math.abs(cosLat) < EPS_COS_LAT_POLE) {
       // Near the poles, longitude is meaningless for distance; include all longitudes
       needsLonFilter = false;
     } else {
-      const degLon = radiusM / (111320 * cosLat);
+      const degLon = radiusM / (METERS_PER_DEG_LAT * cosLat);
       if (degLon >= 180) {
         needsLonFilter = false; // covers the globe in longitude
       } else {

@@ -200,12 +200,13 @@ const compassText = computed(() =>
   return `${ dirs[idx] } ${ h.toFixed(0) }°`;
 });
 const compassLabel = computed(() => `Compass (${ compassMode.value === 'true' ? 'True' : 'Magnetic' })`);
+// Distance formatting inline (feet/miles thresholds: 5280 ft = 1 mi)
 const distanceDisplay = computed(() =>
 {
   if (distanceM.value == null) return '—';
   if (units.value === 'imperial')
   {
-    const feet = distanceM.value * 3.28084;
+    const feet = distanceM.value * 3.28084; // meters → feet
     return feet >= 528 ? `${ (feet / 5280).toFixed(2) } mi` : `${ feet.toFixed(0) } ft`;
   }
   return distanceM.value >= 1000 ? `${ (distanceM.value / 1000).toFixed(2) } km` : `${ distanceM.value.toFixed(0) } m`;

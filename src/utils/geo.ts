@@ -4,8 +4,10 @@ import type { DB, Waypoint } from '@/db/schema';
 import type { LatLng } from '@/types/latlng';
 import { assertLatLng } from '@/types/latlng';
 
+// Degrees-to-radians conversion (1° = PI/180 rad)
 const RAD = Math.PI / 180;
-export const EARTH_R = 6371000;
+// Mean Earth radius in meters (spherical approximation)
+export const EARTH_R = 6_371_000;
 
 export function haversineDistanceMeters(a: LatLng, b: LatLng): number {
   const R = 6371000;

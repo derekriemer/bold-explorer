@@ -145,6 +145,17 @@ export class WaypointsRepo {
     return this.db.updateTable('waypoint').set({ name }).where('id', '=', id).execute().then(() => {});
   }
 
+  async update(id: number, patch: { name?: string; lat?: number; lon?: number; elev_m?: number | null; description?: string | null }): Promise<void> {
+    const upd: any = {};
+    if (patch.name != null) upd.name = patch.name;
+    if (patch.lat != null) upd.lat = patch.lat;
+    if (patch.lon != null) upd.lon = patch.lon;
+    if (patch.elev_m !== undefined) upd.elev_m = patch.elev_m;
+    if (patch.description !== undefined) upd.description = patch.description;
+    if (Object.keys(upd).length === 0) return;
+    await this.db.updateTable('waypoint').set(upd).where('id', '=', id).execute();
+  }
+
   async remove(id: number): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       await trx.deleteFrom('trail_waypoint').where('waypoint_id', '=', id).execute();

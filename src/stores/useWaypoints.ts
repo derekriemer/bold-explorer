@@ -40,6 +40,9 @@ export const useWaypoints = defineStore('waypoints', {
     async rename(id: number, name: string) {
       await this.$repos.waypoints.rename(id, name);
     },
+    async update(id: number, patch: { name?: string; lat?: number; lon?: number; elev_m?: number | null; description?: string | null }) {
+      await this.$repos.waypoints.update(id, patch);
+    },
     async remove(id: number) {
       await this.$repos.waypoints.remove(id);
     },

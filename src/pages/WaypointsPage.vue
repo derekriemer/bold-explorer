@@ -41,7 +41,7 @@
             <div class="row" v-if="wp.description"><span class="k">Description:</span> <span class="v">{{ wp.description }}</span></div>
             <div class="actions">
               <ion-button size="small" fill="outline" @click=" onAttach(wp.id as number) ">Attach</ion-button>
-              <ion-button size="small" fill="outline" @click=" onRename(wp.id as number, wp.name) ">Rename</ion-button>
+              <ion-button size="small" fill="outline" @click=" onEdit(wp.id as number, wp.name) ">Edit</ion-button>
               <ion-button size="small" color="danger" fill="clear" @click=" onDelete(wp.id as number) ">Delete</ion-button>
             </div>
           </div>
@@ -50,11 +50,18 @@
 
       <ion-toast :is-open=" toastOpen " :message=" toastMessage " :duration=" 1800 " @didDismiss="toastOpen = false" />
 
-      <ion-alert :is-open=" renameOpen " header="Rename Waypoint"
-        :inputs=" [{ name: 'name', type: 'text', value: renameDraft, attributes: { 'aria-label': 'Name' } }] " :buttons=" [
+      <ion-alert :is-open=" editOpen " header="Edit Waypoint"
+        :inputs=" [
+          { name: 'name', type: 'text', value: editName, attributes: { 'aria-label': 'Name' } },
+          { name: 'lat', type: 'number', value: editLat, attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
+          { name: 'lon', type: 'number', value: editLon, attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
+          { name: 'elev_m', type: 'number', value: editElev, placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
+        ] "
+        :buttons=" [
           { text: 'Cancel', role: 'cancel' },
-          { text: 'Save', role: 'confirm', handler: (data: any) => doRename(data?.name) }
-        ] " @didDismiss="renameOpen = false" />
+          { text: 'Save', role: 'confirm', handler: (data: any) => { doEdit(data); } }
+        ] "
+        @didDismiss="editOpen = false" />
 
       <ion-alert :is-open=" deleteOpen " header="Delete Waypoint?" message="This cannot be undone." :buttons=" [
         { text: 'Cancel', role: 'cancel' },
@@ -194,35 +201,50 @@ function handleAddConfirm (data: any): boolean
   return true;
 }
 
-// Rename
-const renameOpen = ref(false);
-const renameId = ref<number | null>(null);
-const renameDraft = ref('');
-const renamePrevName = ref<string>('');
-function onRename (id: number, currentName: string)
+// Edit (name, lat, lon, elevation)
+const editOpen = ref(false);
+const editId = ref<number | null>(null);
+const editName = ref('');
+const editLat = ref<number | null>(null);
+const editLon = ref<number | null>(null);
+const editElev = ref<number | null>(null);
+const prevSnapshot = ref<Waypoint | null>(null);
+function onEdit (id: number, currentName: string)
 {
-  renameId.value = id;
-  renameDraft.value = currentName;
-  renamePrevName.value = currentName;
-  renameOpen.value = true;
+  const wp = (wps.all as any as Waypoint[]).find(w => (w.id as any) === id) ?? null;
+  if (!wp) return;
+  editId.value = id;
+  editName.value = currentName;
+  editLat.value = wp.lat;
+  editLon.value = wp.lon;
+  editElev.value = wp.elev_m ?? null;
+  prevSnapshot.value = { ...wp } as any;
+  editOpen.value = true;
 }
-async function doRename (name: string)
+async function doEdit (data: any)
 {
-  if (!renameId.value) return;
-  const v = String(name ?? '').trim();
-  if (!v) return;
-  const id = renameId.value;
-  const oldName = renamePrevName.value;
-  await wps.rename(id, v);
+  if (!editId.value) return;
+  const name = String((data?.name ?? editName.value) ?? '').trim();
+  const lat = Number(data?.lat ?? editLat.value);
+  const lon = Number(data?.lon ?? editLon.value);
+  const elev = data?.elev_m != null && data.elev_m !== '' ? Number(data.elev_m) : null;
+  if (!name || !isValidLat(lat) || !isValidLon(lon))
+  {
+    actions.show('Enter a valid name, lat (-90..90), and lon (-180..180)', { kind: 'error', placement: 'banner-top' });
+    return;
+  }
+  const id = editId.value;
+  const prev = prevSnapshot.value;
+  await wps.update(id, { name, lat, lon, elev_m: elev });
   await wps.refreshAll();
-  actions.show(`Renamed "${ oldName }" → "${ v }"`, {
+  actions.show('Waypoint updated', {
     kind: 'success',
-    canUndo: true,
-    onUndo: async () =>
+    canUndo: !!prev,
+    onUndo: prev ? async () =>
     {
-      await wps.rename(id, oldName);
+      await wps.update(id, { name: prev.name, lat: prev.lat, lon: prev.lon, elev_m: prev.elev_m ?? null });
       await wps.refreshAll();
-    }
+    } : undefined
   });
 }
 

@@ -91,7 +91,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
-import { useGeolocation } from '@/composables/useGeolocation';
+import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
+import { locationStream } from '@/data/streams/location';
 import { useWaypointDistances } from '@/composables/useWaypointDistances';
 import { formatDistance as fmtDistance } from '@/composables/useDistance';
 import { usePrefsStore } from '@/stores/usePrefs';
@@ -103,7 +104,8 @@ import { actionsService } from '@/services/actions.service';
 
 const wps = useWaypoints();
 const trails = useTrails();
-const { current: gps, start, stop, recenter, ensurePermissions } = useGeolocation();
+type Fix = { lat: number; lon: number; accuracy?: number; altitude?: number | null; ts?: number };
+const gps = ref<Fix | null>(null);
 const route = useRoute();
 const actions = useActions();
 
@@ -152,12 +154,18 @@ async function onToggleLive ()
   {
     const ok = await ensurePermissions();
     if (!ok) { liveUpdates.value = false; return; }
-    await start();
-    await recenter();
+    await locationStream.start();
+    // Subscribe for updates locally
+    liveSub = locationStream.updates.subscribe((s) =>
+    {
+      gps.value = { lat: s.lat, lon: s.lon, accuracy: s.accuracy, altitude: s.altitude ?? null, ts: s.timestamp };
+    });
+    await recenterFast();
     await refreshDistances();
   } else
   {
-    await stop();
+    try { liveSub?.unsubscribe(); } catch {}
+    liveSub = null;
   }
 }
 
@@ -337,9 +345,44 @@ onIonViewWillEnter(async () =>
   if (explicitCenter) return; // Respect explicit location passed from previous page
   const ok = await ensurePermissions();
   if (!ok) return;
-  await recenter({ enableHighAccuracy: true });
+  await recenterFast();
   await refreshDistances();
 });
+
+// --- Permissions and snapshot helpers ---
+async function ensurePermissions (): Promise<boolean>
+{
+  try
+  {
+    const status = await Geolocation.checkPermissions();
+    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
+    if (granted) return true;
+    const req = await Geolocation.requestPermissions();
+    return (req as any).location === 'granted' || (req as any).coarseLocation === 'granted' || (req as any).fineLocation === 'granted';
+  } catch { return true; }
+}
+
+async function recenterFast ()
+{
+  try
+  {
+    const opts: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
+    const pos = await Geolocation.getCurrentPosition(opts);
+    gps.value = {
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      accuracy: pos.coords.accuracy ?? undefined,
+      altitude: pos.coords.altitude ?? null,
+      ts: (pos as any).timestamp ?? Date.now()
+    };
+  } catch (e)
+  {
+    console.warn('[Waypoints] recenter snapshot failed', e);
+  }
+}
+
+import type { Subscription } from 'rxjs';
+let liveSub: Subscription | null = null;
 </script>
 <style scoped>
 h2 {

@@ -17,6 +17,20 @@
           <ion-card-content>
             <ion-list inset>
               <ion-item>
+                <ion-label>Provider</ion-label>
+                <ion-segment v-model=" providerKind " @ionChange=" onProviderChange ">
+                  <ion-segment-button value="geolocation">
+                    <ion-label>GPS</ion-label>
+                  </ion-segment-button>
+                  <ion-segment-button value="mock">
+                    <ion-label>Mock</ion-label>
+                  </ion-segment-button>
+                  <ion-segment-button value="replay">
+                    <ion-label>Replay</ion-label>
+                  </ion-segment-button>
+                </ion-segment>
+              </ion-item>
+              <ion-item>
                 <ion-label>Enable High Accuracy</ion-label>
                 <ion-toggle v-model=" optEnableHighAccuracy " />
               </ion-item>
@@ -126,21 +140,39 @@ import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonBackButton, IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonList, IonItem, IonLabel, IonInput, IonToggle
+  IonList, IonItem, IonLabel, IonInput, IonToggle, IonSegment, IonSegmentButton
 } from '@ionic/vue';
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Capacitor } from '@capacitor/core';
 import { useWaypoints } from '@/stores/useWaypoints';
-import { useGeolocation } from '@/composables/useGeolocation';
+import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
+import { locationStream, providerRegistry } from '@/data/streams/location';
 import { useActions } from '@/composables/useActions';
 import { Heading } from '@/plugins/heading';
 
-const { current: gps, best, watching, start, stop, recenter: recenterGps, ensurePermissions, m2ft } = useGeolocation();
+type Fix = { lat: number; lon: number; accuracy?: number; altitude?: number | null; ts?: number };
+const gps = ref<Fix | null>(null);
+const best = ref<Fix | null>(null);
+const watching = ref<boolean>(false);
 const actions = useActions();
 const wps = useWaypoints();
 const isWeb = Capacitor.getPlatform() === 'web';
 
-async function recenter () { await recenterGps(); }
+async function recenter ()
+{
+  try
+  {
+    const opts: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
+    const pos = await Geolocation.getCurrentPosition(opts);
+    gps.value = {
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      accuracy: pos.coords.accuracy ?? undefined,
+      altitude: pos.coords.altitude ?? null,
+      ts: (pos as any).timestamp ?? Date.now()
+    };
+  } catch (e) { console.warn('[Debug] recenter failed', e); }
+}
 
 // Compass plugin state
 const headingMag = ref<number | null>(null);
@@ -165,6 +197,7 @@ const settleMs = ref<number>(15000);
 const optEnableHighAccuracy = ref<boolean>(true);
 const optMaximumAge = ref<number>(0);
 const optTimeout = ref<number>(45000);
+const providerKind = ref<'geolocation' | 'mock' | 'replay' | 'background'>(providerRegistry.getActiveKind());
 
 type Applied = { minAccuracyM: number; settleMs: number; options: { enableHighAccuracy: boolean; maximumAge: number; timeout: number } };
 const lastApplied = ref<Applied | null>(null);
@@ -196,14 +229,18 @@ watch(gps, (g) =>
     fixCount.value += 1;
     lastCurrentTs = g.ts ?? Date.now();
   }
-});
-watch(best, (b) =>
-{
-  if (!b) return;
-  if (b.ts != null && b.ts !== lastBestTs)
+  // Track best by smallest accuracy
+  if (g?.accuracy != null)
   {
-    bestCount.value += 1;
-    lastBestTs = b.ts ?? Date.now();
+    if (!best.value || best.value.accuracy == null || g.accuracy < best.value.accuracy)
+    {
+      best.value = { ...g };
+      if (best.value.ts != null && best.value.ts !== lastBestTs)
+      {
+        bestCount.value += 1;
+        lastBestTs = best.value.ts ?? Date.now();
+      }
+    }
   }
 });
 
@@ -222,9 +259,21 @@ function getApplied (): Applied
 
 async function restartWatch ()
 {
-  await stop();
+  await stopWatch();
   const cfg = getApplied();
-  await start({ minAccuracyM: cfg.minAccuracyM, settleMs: cfg.settleMs, options: cfg.options });
+  // Configure provider + stream filters
+  locationStream.configureProvider({ maximumAgeMs: cfg.options.maximumAge, timeoutMs: cfg.options.timeout });
+  locationStream.configureWatch({ minAccuracyM: cfg.minAccuracyM, minIntervalMs: 1000, distanceMinM: 0 });
+  const ok = await ensurePermissions();
+  if (ok)
+  {
+    await locationStream.start();
+    watching.value = true;
+    if (!sub) sub = locationStream.updates.subscribe((s) =>
+    {
+      gps.value = { lat: s.lat, lon: s.lon, accuracy: s.accuracy, altitude: s.altitude ?? null, ts: s.timestamp };
+    });
+  }
   lastApplied.value = cfg;
   lastStartAt.value = Date.now();
   fixCount.value = 0;
@@ -233,7 +282,15 @@ async function restartWatch ()
 
 async function stopWatch ()
 {
-  await stop();
+  try { sub?.unsubscribe(); } catch {}
+  sub = null;
+  await locationStream.stop();
+  watching.value = false;
+}
+
+function onProviderChange ()
+{
+  providerRegistry.switchTo(providerKind.value);
 }
 
 function applyDefaults ()
@@ -360,7 +417,27 @@ onBeforeUnmount(() =>
 {
   try { removeHeadingListener?.(); } catch (e) { console.warn('[DebugPage] removeHeadingListener failed', e); }
   removeHeadingListener = null;
+  try { sub?.unsubscribe(); } catch {}
+  sub = null;
 });
+
+// --- Shared helpers
+async function ensurePermissions (): Promise<boolean>
+{
+  try
+  {
+    const status = await Geolocation.checkPermissions();
+    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
+    if (granted) return true;
+    const req = await Geolocation.requestPermissions();
+    return (req as any).location === 'granted' || (req as any).coarseLocation === 'granted' || (req as any).fineLocation === 'granted';
+  } catch { return true; }
+}
+
+const m2ft = (m?: number) => (m == null ? undefined : m * 3.28084);
+
+import type { Subscription } from 'rxjs';
+let sub: Subscription | null = null;
 </script>
 <style scoped>
 .telemetry {

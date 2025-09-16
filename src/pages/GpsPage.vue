@@ -109,7 +109,8 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Capacitor } from '@capacitor/core';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
-import { useGeolocation } from '@/composables/useGeolocation';
+import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
+import { locationStream } from '@/data/streams/location';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
 import { usePrefsStore } from '@/stores/usePrefs';
@@ -117,6 +118,8 @@ import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { Heading } from '@/plugins/heading';
+import { Subject, type Subscription } from 'rxjs';
+import { throttleTime } from 'rxjs/operators';
 
 type Scope = 'waypoint' | 'trail';
 
@@ -128,7 +131,8 @@ const waypointsAll = computed(() => wps.all);
 const selectedWaypointId = ref<number | null>(null);
 const selectedTrailId = ref<number | null>(null);
 
-const { current: gps, recenter: recenterGps, autoStartOnMounted } = useGeolocation();
+type Fix = { lat: number; lon: number; accuracy?: number; altitude?: number | null; heading?: number | null; speed?: number | null; ts?: number };
+const gps = ref<Fix | null>(null);
 
 const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
@@ -142,6 +146,9 @@ const isWeb = Capacitor.getPlatform() === 'web';
 const headingMag = ref<number | null>(null);
 const headingTrue = ref<number | null>(null);
 let removeHeadingListener: (() => void) | null = null;
+// RxJS stream to throttle compass updates to 1 Hz
+const headingEvents$ = new Subject<import('@/plugins/heading').HeadingReading>();
+let headingThrottleSub: Subscription | null = null;
 
 const targetCoord = computed(() =>
 {
@@ -223,7 +230,24 @@ async function toggleFollow ()
 
 async function recenter ()
 {
-  await recenterGps();
+  // Snapshot current position to prime UI without waiting for next stream tick
+  const opts: PositionOptions = { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 };
+  try
+  {
+    const pos = await Geolocation.getCurrentPosition(opts);
+    gps.value = {
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      accuracy: pos.coords.accuracy ?? undefined,
+      altitude: pos.coords.altitude ?? null,
+      heading: pos.coords.heading ?? null,
+      speed: pos.coords.speed ?? null,
+      ts: (pos as any).timestamp ?? Date.now()
+    };
+  } catch (e)
+  {
+    console.warn('[GpsPage] recenter failed', e);
+  }
 }
 
 function clearWaypoint ()
@@ -281,6 +305,29 @@ async function markWaypoint ()
 onMounted(async () =>
 {
   await Promise.all([trails.refresh(), wps.refreshAll()]);
+  // Start the unified location stream
+  try
+  {
+    const ok = await ensurePermissions();
+    if (ok)
+    {
+      await locationStream.start();
+      // Subscribe for updates
+      gpsSub = locationStream.updates.subscribe((s) =>
+      {
+        gps.value = { lat: s.lat, lon: s.lon, accuracy: s.accuracy, altitude: s.altitude ?? null, heading: s.heading ?? null, speed: s.speed ?? null, ts: s.timestamp };
+      });
+      // Seed a fast snapshot for UI
+      await recenter();
+    } else
+    {
+      actions.show('Location permission denied. Enable it in Settings to use GPS features.', { kind: 'error', placement: 'banner-top', durationMs: null, dismissLabel: 'Dismiss' });
+    }
+  } catch (e)
+  {
+    console.warn('[GpsPage] start stream failed', e);
+  }
+
   // prefs store is hydrated on app startup; values are reactive
   if (!isWeb)
   {
@@ -288,14 +335,19 @@ onMounted(async () =>
     {
       console.info('[Heading] init: platform', Capacitor.getPlatform());
       console.info('[Heading] has start:', typeof (Heading as any)?.start);
-      const sub = await Heading.addListener('heading', (evt) =>
-      {
-        const mag = typeof (evt as any)?.magnetic === 'number' ? (evt as any).magnetic : null;
-        const tru = typeof (evt as any)?.true === 'number' ? (evt as any).true : null;
-        headingMag.value = mag;
-        headingTrue.value = tru;
+      // Listen to native heading events and push through RxJS subject
+      const sub = await Heading.addListener('heading', (evt) => { headingEvents$.next(evt); });
 
-      });
+      // Throttle to at most one event per second for UI readout
+      headingThrottleSub = headingEvents$
+        .pipe(throttleTime(1000))
+        .subscribe((evt) =>
+        {
+          const mag = typeof (evt as any)?.magnetic === 'number' ? (evt as any).magnetic : null;
+          const tru = typeof (evt as any)?.true === 'number' ? (evt as any).true : null;
+          headingMag.value = mag;
+          headingTrue.value = tru;
+        });
       console.info('[Heading] addListener attached; calling start');
       await Heading.start({ useTrueNorth: true });
       console.info('[Heading] start called');
@@ -307,21 +359,17 @@ onMounted(async () =>
   }
 });
 
-autoStartOnMounted({
-  recenter: true,
-  onDenied: () =>
-  {
-    actions.show('Location permission denied. Enable it in Settings to use GPS features.', {
-      kind: 'error', placement: 'banner-top', durationMs: null, dismissLabel: 'Dismiss'
-    });
-  }
-});
-
 onBeforeUnmount(() =>
 {
   try { removeHeadingListener?.(); }
   catch (e) { console.warn('[GpsPage] removeHeadingListener failed', e); }
   removeHeadingListener = null;
+  try { headingThrottleSub?.unsubscribe(); }
+  catch (e) { console.warn('[GpsPage] headingThrottleSub unsubscribe failed', e); }
+  headingThrottleSub = null;
+  try { gpsSub?.unsubscribe(); } catch {}
+  gpsSub = null;
+  // Do not stop the global stream here; other tabs may use it concurrently.
 });
 
 // compassMode persists via prefs store actions
@@ -343,6 +391,25 @@ watch(gps, async (pos) =>
   }
   catch (e) { console.warn('[Heading] setLocation error', e); }
 });
+
+// --- Permissions helper and local subscription handle ---
+async function ensurePermissions (): Promise<boolean>
+{
+  try
+  {
+    const status = await Geolocation.checkPermissions();
+    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
+    if (granted) return true;
+    const req = await Geolocation.requestPermissions();
+    return (req as any).location === 'granted' || (req as any).coarseLocation === 'granted' || (req as any).fineLocation === 'granted';
+  } catch
+  {
+    return true; // allow in dev web
+  }
+}
+
+import type { Subscription } from 'rxjs';
+let gpsSub: Subscription | null = null;
 </script>
 <style scoped>
 .telemetry {

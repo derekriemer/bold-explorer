@@ -110,7 +110,8 @@ import { Capacitor } from '@capacitor/core';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
-import { locationStream } from '@/data/streams/location';
+import { useLocation } from '@/stores/useLocation';
+import { compassStream } from '@/data/streams/compass';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
 import { usePrefsStore } from '@/stores/usePrefs';
@@ -118,7 +119,7 @@ import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { Heading } from '@/plugins/heading';
-import { Subject, type Subscription } from 'rxjs';
+import type { Subscription } from 'rxjs';
 import { throttleTime } from 'rxjs/operators';
 
 type Scope = 'waypoint' | 'trail';
@@ -131,8 +132,16 @@ const waypointsAll = computed(() => wps.all);
 const selectedWaypointId = ref<number | null>(null);
 const selectedTrailId = ref<number | null>(null);
 
-type Fix = { lat: number; lon: number; accuracy?: number; altitude?: number | null; heading?: number | null; speed?: number | null; ts?: number };
-const gps = ref<Fix | null>(null);
+const loc = useLocation();
+const gps = computed(() => loc.current ? {
+  lat: loc.current.lat,
+  lon: loc.current.lon,
+  accuracy: loc.current.accuracy,
+  altitude: loc.current.altitude ?? null,
+  heading: loc.current.heading ?? null,
+  speed: loc.current.speed ?? null,
+  ts: (loc.current as any).timestamp ?? null
+} : null);
 
 const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
@@ -146,8 +155,7 @@ const isWeb = Capacitor.getPlatform() === 'web';
 const headingMag = ref<number | null>(null);
 const headingTrue = ref<number | null>(null);
 let removeHeadingListener: (() => void) | null = null;
-// RxJS stream to throttle compass updates to 1 Hz
-const headingEvents$ = new Subject<import('@/plugins/heading').HeadingReading>();
+// Subscription to throttle compass updates to 1 Hz
 let headingThrottleSub: Subscription | null = null;
 
 const targetCoord = computed(() =>
@@ -235,15 +243,18 @@ async function recenter ()
   try
   {
     const pos = await Geolocation.getCurrentPosition(opts);
-    gps.value = {
+    // Seed store for immediate UI without waiting for next stream tick
+    loc.current = {
       lat: pos.coords.latitude,
       lon: pos.coords.longitude,
       accuracy: pos.coords.accuracy ?? undefined,
       altitude: pos.coords.altitude ?? null,
       heading: pos.coords.heading ?? null,
       speed: pos.coords.speed ?? null,
-      ts: (pos as any).timestamp ?? Date.now()
-    };
+      timestamp: (pos as any).timestamp ?? Date.now(),
+      provider: 'geolocation',
+      raw: pos
+    } as any;
   } catch (e)
   {
     console.warn('[GpsPage] recenter failed', e);
@@ -305,18 +316,13 @@ async function markWaypoint ()
 onMounted(async () =>
 {
   await Promise.all([trails.refresh(), wps.refreshAll()]);
-  // Start the unified location stream
+  // Start the unified location store
   try
   {
     const ok = await ensurePermissions();
     if (ok)
     {
-      await locationStream.start();
-      // Subscribe for updates
-      gpsSub = locationStream.updates.subscribe((s) =>
-      {
-        gps.value = { lat: s.lat, lon: s.lon, accuracy: s.accuracy, altitude: s.altitude ?? null, heading: s.heading ?? null, speed: s.speed ?? null, ts: s.timestamp };
-      });
+      await loc.start();
       // Seed a fast snapshot for UI
       await recenter();
     } else
@@ -335,11 +341,9 @@ onMounted(async () =>
     {
       console.info('[Heading] init: platform', Capacitor.getPlatform());
       console.info('[Heading] has start:', typeof (Heading as any)?.start);
-      // Listen to native heading events and push through RxJS subject
-      const sub = await Heading.addListener('heading', (evt) => { headingEvents$.next(evt); });
-
+      await compassStream.start({ useTrueNorth: true });
       // Throttle to at most one event per second for UI readout
-      headingThrottleSub = headingEvents$
+      headingThrottleSub = compassStream.updates
         .pipe(throttleTime(1000))
         .subscribe((evt) =>
         {
@@ -348,10 +352,7 @@ onMounted(async () =>
           headingMag.value = mag;
           headingTrue.value = tru;
         });
-      console.info('[Heading] addListener attached; calling start');
-      await Heading.start({ useTrueNorth: true });
-      console.info('[Heading] start called');
-      removeHeadingListener = () => { sub.remove(); void Heading.stop(); };
+      removeHeadingListener = () => { void compassStream.stop(); };
     } catch (e)
     {
       console.error('[Heading] init error', e);
@@ -367,8 +368,7 @@ onBeforeUnmount(() =>
   try { headingThrottleSub?.unsubscribe(); }
   catch (e) { console.warn('[GpsPage] headingThrottleSub unsubscribe failed', e); }
   headingThrottleSub = null;
-  try { gpsSub?.unsubscribe(); } catch {}
-  gpsSub = null;
+  try { loc.detach(); } catch {}
   // Do not stop the global stream here; other tabs may use it concurrently.
 });
 
@@ -380,14 +380,14 @@ watch(selectedTrailId, async (id) =>
 });
 
 // Feed location to native Heading plugin for true north declination
-watch(gps, async (pos) =>
+watch(() => gps.value, async (pos) =>
 {
   if (!pos) return;
   if (isWeb) return;
   try
   {
     console.info('[Heading] setLocation ->', pos.lat, pos.lon, pos.altitude ?? undefined);
-    await Heading.setLocation?.({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
+    await compassStream.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
   }
   catch (e) { console.warn('[Heading] setLocation error', e); }
 });
@@ -408,8 +408,7 @@ async function ensurePermissions (): Promise<boolean>
   }
 }
 
-import type { Subscription } from 'rxjs';
-let gpsSub: Subscription | null = null;
+// no gpsSub; store handles subscription lifecycle
 </script>
 <style scoped>
 .telemetry {

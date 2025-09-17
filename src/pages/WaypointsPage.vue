@@ -92,7 +92,7 @@ import { useRoute } from 'vue-router';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
 import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
-import { locationStream } from '@/data/streams/location';
+import { useLocation } from '@/stores/useLocation';
 import { useWaypointDistances } from '@/composables/useWaypointDistances';
 import { formatDistance as fmtDistance } from '@/composables/useDistance';
 import { usePrefsStore } from '@/stores/usePrefs';
@@ -104,8 +104,7 @@ import { actionsService } from '@/services/actions.service';
 
 const wps = useWaypoints();
 const trails = useTrails();
-type Fix = { lat: number; lon: number; accuracy?: number; altitude?: number | null; ts?: number };
-const gps = ref<Fix | null>(null);
+const loc = useLocation();
 const route = useRoute();
 const actions = useActions();
 
@@ -126,7 +125,7 @@ function toggleExpand (id: number)
 const centerOnRoute = computed<{ lat: number; lon: number } | null>(() => getCenterFromRoute());
 const { distances, byDistance, refresh: refreshDistances } = useWaypointDistances({
   waypoints: computed(() => wps.all as Selectable<Waypoint>[]),
-  gps: computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null),
+  gps: computed(() => loc.current ? { lat: loc.current.lat, lon: loc.current.lon } : null),
   throttleMs: 800,
   initialCenter: centerOnRoute.value
 });
@@ -154,18 +153,12 @@ async function onToggleLive ()
   {
     const ok = await ensurePermissions();
     if (!ok) { liveUpdates.value = false; return; }
-    await locationStream.start();
-    // Subscribe for updates locally
-    liveSub = locationStream.updates.subscribe((s) =>
-    {
-      gps.value = { lat: s.lat, lon: s.lon, accuracy: s.accuracy, altitude: s.altitude ?? null, ts: s.timestamp };
-    });
+    await loc.start();
     await recenterFast();
     await refreshDistances();
   } else
   {
-    try { liveSub?.unsubscribe(); } catch {}
-    liveSub = null;
+    loc.detach();
   }
 }
 
@@ -368,21 +361,21 @@ async function recenterFast ()
   {
     const opts: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
     const pos = await Geolocation.getCurrentPosition(opts);
-    gps.value = {
+    // Seed the store's current value to improve initial responsiveness
+    loc.current = {
       lat: pos.coords.latitude,
       lon: pos.coords.longitude,
       accuracy: pos.coords.accuracy ?? undefined,
       altitude: pos.coords.altitude ?? null,
-      ts: (pos as any).timestamp ?? Date.now()
-    };
+      timestamp: (pos as any).timestamp ?? Date.now(),
+      provider: 'geolocation',
+      raw: pos
+    } as any;
   } catch (e)
   {
     console.warn('[Waypoints] recenter snapshot failed', e);
   }
 }
-
-import type { Subscription } from 'rxjs';
-let liveSub: Subscription | null = null;
 </script>
 <style scoped>
 h2 {

@@ -42,6 +42,7 @@ import {
   IonButtons, IonBackButton
 } from '@ionic/vue';
 import { computed } from 'vue';
+import { compassStream } from '@/data/streams/compass';
 import { usePrefsStore } from '@/stores/usePrefs';
 
 const prefs = usePrefsStore();
@@ -70,5 +71,6 @@ async function onAudioToggle() {
 async function onCompassToggle(ev: CustomEvent) {
   const checked = (ev as any).detail?.checked === true;
   compassMode.value = checked ? 'true' : 'magnetic';
+  try { await compassStream.setTrueNorth(checked); } catch (e) { console.warn('[Settings] setTrueNorth failed', e); }
 }
 </script>

@@ -125,6 +125,11 @@ import { useWaypoints } from '@/stores/useWaypoints';
 import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
 import { useLocation } from '@/stores/useLocation';
 import { compassStream } from '@/data/streams/compass';
+import { useCompass } from '@/composables/useCompass';
+import { useTarget } from '@/composables/useTarget';
+import { useBearingDistance } from '@/composables/useBearingDistance';
+import { useWaypointActions } from '@/composables/useWaypointActions';
+import { ensureLocationGranted } from '@/composables/usePermissions';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
 import { usePrefsStore } from '@/stores/usePrefs';
@@ -132,22 +137,25 @@ import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { Heading } from '@/plugins/heading';
-import type { Subscription } from 'rxjs';
-import { throttleTime } from 'rxjs/operators';
 
 /** Page scope selection: operate on a waypoint or a trail. */
 type Scope = 'waypoint' | 'trail';
-
-const scope = ref<Scope>('waypoint');
 const trails = useTrails();
 const wps = useWaypoints();
 /** Shortcut to all waypoints managed by the Waypoints store. */
 const waypointsAll = computed(() => wps.all);
 
-/** Waypoint selection when in waypoint scope. */
-const selectedWaypointId = ref<number | null>(null);
 /** Trail selection when in trail scope. */
 const selectedTrailId = ref<number | null>(null);
+
+// Target selection (waypoint vs trail)
+const waypointsNamed = computed(() => (wps.all as any[]).map((w) => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon })));
+const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
+const target = useTarget({ waypoints: waypointsNamed, trailWaypoints });
+const scope = target.scope;
+const selectedWaypointId = target.selectedWaypointId;
+const targetCoord = target.targetCoord;
+const targetName = target.targetName;
 
 const loc = useLocation();
 /** Latest location sample exposed in a convenient shape for the UI. */
@@ -162,7 +170,6 @@ const gps = computed(() => loc.current ? {
 } : null);
 
 /** Current trail’s waypoints in a minimal form for Follow‑Trail logic. */
-const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
   //codex: brace function
   useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
@@ -171,47 +178,18 @@ const prefs = usePrefsStore();
 const actions = useActions();
 
 const isWeb = Capacitor.getPlatform() === 'web';
-// Compass plugin state
-/** Last magnetic heading and true heading (if declination applied). */
-const headingMag = ref<number | null>(null);
-const headingTrue = ref<number | null>(null);
-let removeHeadingListener: (() => void) | null = null;
-// Subscription to throttle compass updates to 1 Hz
-let headingThrottleSub: Subscription | null = null;
+// Compass via composable (throttled to 1 Hz)
+const compass = useCompass({ throttleMs: 1000, initialMode: prefs.compassMode, autoStart: false });
 
-/** Selected target coordinate from waypoint or active trail. */
-const targetCoord = computed(() =>
-{
-  if (!gps.value) return null;
-  if (scope.value === 'waypoint')
-  {
-    const t = waypointsAll.value.find(w => w.id === selectedWaypointId.value);
-    return t ? { lat: t.lat, lon: t.lon } : null;
-  }
-  if (scope.value === 'trail')
-  {
-    const t = next.value;
-    return t ? { lat: t.lat, lon: t.lon } : null;
-  }
-  return null;
+// Derived UI values via composables
+const { trueNorthBearingDeg, userBearingText, distanceM, distanceText } = useBearingDistance({
+  gps: computed(() => (gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null)),
+  target: computed(() => targetCoord.value),
+  headingDeg: computed(() => compass.headingDeg.value),
+  units: computed(() => prefs.units)
 });
-
-/** Great‑circle bearing to target (deg), computed from GPS fixes (not compass). */
-const bearingDeg = computed(() =>
-  (gps.value && targetCoord.value)
-    ? initialBearingDeg({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value)
-    : null
-);
-/** Great‑circle distance to target (meters). */
-const distanceM = computed(() => (gps.value && targetCoord.value) ? haversineDistanceMeters({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value) : null);
-
-const bearingDisplay = computed(() => bearingDeg.value != null ? `${ bearingDeg.value.toFixed(0) }°` : '—');
-/** Heading to display based on preference (true vs magnetic). */
-const compassHeadingDeg = computed(() =>
-{
-  if (prefs.compassMode === 'true') return headingTrue.value;
-  return headingMag.value;
-});
+const bearingDisplay = computed(() => userBearingText.value);
+const compassHeadingDeg = computed(() => compass.headingDeg.value);
 /** Human‑readable target name for bearing label. */
 const targetName = computed(() =>
 {
@@ -326,16 +304,9 @@ async function markWaypoint ()
   const point = { name: `WP ${ new Date().toLocaleTimeString() }`, lat: gps.value.lat, lon: gps.value.lon, elev_m: null };
   try
   {
-    if (scope.value === 'trail' && selectedTrailId.value)
-    {
-      await wps.addToTrail(selectedTrailId.value, point);
-      await wps.loadForTrail(selectedTrailId.value);
-      actions.show('Waypoint added to trail', { kind: 'success' });
-    } else
-    {
-      await wps.create(point);
-      actions.show('Waypoint created', { kind: 'success' });
-    }
+    const wpa = useWaypointActions();
+    if (scope.value === 'trail' && selectedTrailId.value) { await wpa.addToTrail(selectedTrailId.value, point); }
+    else { await wpa.createStandalone(point); }
   } catch (err: any)
   {
     console.error('Mark waypoint failed', err);
@@ -352,16 +323,9 @@ onMounted(async () =>
   // Start the unified location store
   try
   {
-    const ok = await ensurePermissions();
-    if (ok)
-    {
-      await loc.start();
-      // Seed a fast snapshot for UI
-      await recenter();
-    } else
-    {
-      actions.show('Location permission denied. Enable it in Settings to use GPS features.', { kind: 'error', placement: 'banner-top', durationMs: null, dismissLabel: 'Dismiss' });
-    }
+    const ok = await ensureLocationGranted();
+    if (ok) { await loc.start(); await recenter(); }
+    else { actions.show('Location permission denied. Enable it in Settings to use GPS features.', { kind: 'error', placement: 'banner-top', durationMs: null, dismissLabel: 'Dismiss' }); }
   } catch (e)
   {
     console.warn('[GpsPage] start stream failed', e);
@@ -374,18 +338,7 @@ onMounted(async () =>
     {
       console.info('[Heading] init: platform', Capacitor.getPlatform());
       console.info('[Heading] has start:', typeof (Heading as any)?.start);
-      await compassStream.start({ useTrueNorth: true });
-      // Throttle to at most one event per second for UI readout
-      headingThrottleSub = compassStream.updates
-        .pipe(throttleTime(1000))
-        .subscribe((evt) =>
-        {
-          const mag = typeof (evt as any)?.magnetic === 'number' ? (evt as any).magnetic : null;
-          const tru = typeof (evt as any)?.true === 'number' ? (evt as any).true : null;
-          headingMag.value = mag;
-          headingTrue.value = tru;
-        });
-      removeHeadingListener = () => { void compassStream.stop(); };
+      await compass.start();
     } catch (e)
     {
       console.error('[Heading] init error', e);
@@ -396,12 +349,7 @@ onMounted(async () =>
 // Lifecycle — unmount: detach page‑level subscriptions only
 onBeforeUnmount(() =>
 {
-  try { removeHeadingListener?.(); }
-  catch (e) { console.warn('[GpsPage] removeHeadingListener failed', e); }
-  removeHeadingListener = null;
-  try { headingThrottleSub?.unsubscribe(); }
-  catch (e) { console.warn('[GpsPage] headingThrottleSub unsubscribe failed', e); }
-  headingThrottleSub = null;
+  try { void compass.stop(); } catch {}
   try { loc.detach(); } catch { }
   // Do not stop the global stream here; other tabs may use it concurrently.
 });
@@ -420,24 +368,7 @@ watch(() => gps.value, async (pos) =>
   catch (e) { console.warn('[Heading] setLocation error', e); }
 });
 
-// --- Permissions helper and local subscription handle ---
-/** Request/check geolocation permission; allow in web dev. */
-async function ensurePermissions (): Promise<boolean>
-{
-  try
-  {
-    const status = await Geolocation.checkPermissions();
-    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
-    if (granted) return true;
-    const req = await Geolocation.requestPermissions();
-    return (req as any).location === 'granted' || (req as any).coarseLocation === 'granted' || (req as any).fineLocation === 'granted';
-  } catch
-  {
-    return true; // allow in dev web
-  }
-}
-
-// no gpsSub; store handles subscription lifecycle 
+// no gpsSub; store handles subscription lifecycle
 </script>
 <style scoped>
 .telemetry {

@@ -279,6 +279,7 @@ async function toggleCompassMode ()
 {
   const next = prefs.compassMode === 'true' ? 'magnetic' : 'true';
   await prefs.setCompassMode(next);
+  try { await compassStream.setTrueNorth(next === 'true'); } catch (e) { console.warn('[GpsPage] setTrueNorth failed', e); }
 }
 
 
@@ -408,7 +409,7 @@ async function ensurePermissions (): Promise<boolean>
   }
 }
 
-// no gpsSub; store handles subscription lifecycle
+// no gpsSub; store handles subscription lifecycle 
 </script>
 <style scoped>
 .telemetry {

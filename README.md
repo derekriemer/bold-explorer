@@ -16,6 +16,12 @@ Bold Explorer is a trail and waypoint recorder designed to work fully offline.
 
 See `WAYPOINT_TRAIL_SPEC.md` for the storage‑first architecture and detailed behavior.
 
+## Style Guide
+
+For page organization, coding conventions, and RxJS patterns, see the project Style Guide:
+
+- STYLE_GUIDE.md
+
 ## Repository Layout
 
 - `src/`

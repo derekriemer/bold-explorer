@@ -22,7 +22,7 @@
           <ion-label>Waypoint</ion-label>
           <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected">
             <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
-              }}</ion-select-option>
+            }}</ion-select-option>
           </ion-select>
           <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null"
             @click=" clearWaypoint ">Clear</ion-button>
@@ -40,7 +40,8 @@
               <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px;">
                 <div>
                   <div style="font-weight:600; margin-bottom:4px;">Start a new trail</div>
-                  <div style="color: var(--ion-color-medium);">Record waypoints as you move. The + button adds points to this trail.</div>
+                  <div style="color: var(--ion-color-medium);">Record waypoints as you move. The + button adds points to
+                    this trail.</div>
                 </div>
                 <ion-button color="primary" @click=" recordNewTrail ">Record New Trail</ion-button>
               </div>
@@ -99,6 +100,18 @@
   </ion-page>
 </template>
 <script setup lang="ts">
+/**
+ * GPS Page script layout
+ * 1) Imports
+ * 2) Types
+ * 3) Stores/services and platform flags
+ * 4) UI state (refs)
+ * 5) Derived state (computed)
+ * 6) Actions/handlers
+ * 7) Lifecycle
+ * 8) Watches
+ * 9) Helpers
+ */
 import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
@@ -122,17 +135,22 @@ import { Heading } from '@/plugins/heading';
 import type { Subscription } from 'rxjs';
 import { throttleTime } from 'rxjs/operators';
 
+/** Page scope selection: operate on a waypoint or a trail. */
 type Scope = 'waypoint' | 'trail';
 
 const scope = ref<Scope>('waypoint');
 const trails = useTrails();
 const wps = useWaypoints();
+/** Shortcut to all waypoints managed by the Waypoints store. */
 const waypointsAll = computed(() => wps.all);
 
+/** Waypoint selection when in waypoint scope. */
 const selectedWaypointId = ref<number | null>(null);
+/** Trail selection when in trail scope. */
 const selectedTrailId = ref<number | null>(null);
 
 const loc = useLocation();
+/** Latest location sample exposed in a convenient shape for the UI. */
 const gps = computed(() => loc.current ? {
   lat: loc.current.lat,
   lon: loc.current.lon,
@@ -143,8 +161,10 @@ const gps = computed(() => loc.current ? {
   ts: (loc.current as any).timestamp ?? null
 } : null);
 
+/** Current trail’s waypoints in a minimal form for Follow‑Trail logic. */
 const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
+  //codex: brace function
   useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
 
 const prefs = usePrefsStore();
@@ -152,12 +172,14 @@ const actions = useActions();
 
 const isWeb = Capacitor.getPlatform() === 'web';
 // Compass plugin state
+/** Last magnetic heading and true heading (if declination applied). */
 const headingMag = ref<number | null>(null);
 const headingTrue = ref<number | null>(null);
 let removeHeadingListener: (() => void) | null = null;
 // Subscription to throttle compass updates to 1 Hz
 let headingThrottleSub: Subscription | null = null;
 
+/** Selected target coordinate from waypoint or active trail. */
 const targetCoord = computed(() =>
 {
   if (!gps.value) return null;
@@ -174,21 +196,23 @@ const targetCoord = computed(() =>
   return null;
 });
 
-// Bearing to target from GPS position (not compass heading)
+/** Great‑circle bearing to target (deg), computed from GPS fixes (not compass). */
 const bearingDeg = computed(() =>
   (gps.value && targetCoord.value)
     ? initialBearingDeg({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value)
     : null
 );
+/** Great‑circle distance to target (meters). */
 const distanceM = computed(() => (gps.value && targetCoord.value) ? haversineDistanceMeters({ lat: gps.value.lat, lon: gps.value.lon }, targetCoord.value) : null);
 
 const bearingDisplay = computed(() => bearingDeg.value != null ? `${ bearingDeg.value.toFixed(0) }°` : '—');
-// Heading used for compass display, from native plugin when available
+/** Heading to display based on preference (true vs magnetic). */
 const compassHeadingDeg = computed(() =>
 {
   if (prefs.compassMode === 'true') return headingTrue.value;
   return headingMag.value;
 });
+/** Human‑readable target name for bearing label. */
 const targetName = computed(() =>
 {
   if (scope.value === 'waypoint')
@@ -203,6 +227,7 @@ const targetName = computed(() =>
   return null;
 });
 const bearingLabel = computed(() => targetName.value ? `Bearing to ${ targetName.value }` : 'Bearing');
+/** UI display string for heading. */
 const compassText = computed(() =>
 {
   const h = compassHeadingDeg.value;
@@ -213,6 +238,7 @@ const compassText = computed(() =>
 });
 const compassLabel = computed(() => `Compass: ${ prefs.compassMode.toLocaleUpperCase() } North`);
 // Distance formatting inline (feet/miles thresholds: 5280 ft = 1 mi)
+/** UI display string for distance using selected units. */
 const distanceDisplay = computed(() =>
 {
   if (distanceM.value == null) return '—';
@@ -224,6 +250,7 @@ const distanceDisplay = computed(() =>
   return distanceM.value >= 1000 ? `${ (distanceM.value / 1000).toFixed(2) } km` : `${ distanceM.value.toFixed(0) } m`;
 });
 
+/** Start/stop Follow‑Trail for the selected trail. */
 async function toggleFollow ()
 {
   if (!selectedTrailId.value) return;
@@ -236,6 +263,7 @@ async function toggleFollow ()
   }
 }
 
+/** One‑shot position to prime UI; does not manage stream lifecycle. */
 async function recenter ()
 {
   // Snapshot current position to prime UI without waiting for next stream tick
@@ -266,6 +294,7 @@ function clearWaypoint ()
   selectedWaypointId.value = null;
 }
 
+/** Create and select a new trail for recording waypoints. */
 async function recordNewTrail ()
 {
   const ts = new Date();
@@ -275,6 +304,7 @@ async function recordNewTrail ()
   actions.show('New trail ready. Tap + to record waypoints.', { kind: 'success' });
 }
 
+/** Toggle true vs magnetic north without restarting the compass stream. */
 async function toggleCompassMode ()
 {
   const next = prefs.compassMode === 'true' ? 'magnetic' : 'true';
@@ -283,6 +313,7 @@ async function toggleCompassMode ()
 }
 
 
+/** Record a waypoint at the current GPS fix; attach when in trail scope. */
 async function markWaypoint ()
 {
   if (!gps.value)
@@ -314,6 +345,7 @@ async function markWaypoint ()
 
 
 
+// Lifecycle — mount: start streams and seed fast snapshot
 onMounted(async () =>
 {
   await Promise.all([trails.refresh(), wps.refreshAll()]);
@@ -361,6 +393,7 @@ onMounted(async () =>
   }
 });
 
+// Lifecycle — unmount: detach page‑level subscriptions only
 onBeforeUnmount(() =>
 {
   try { removeHeadingListener?.(); }
@@ -369,31 +402,26 @@ onBeforeUnmount(() =>
   try { headingThrottleSub?.unsubscribe(); }
   catch (e) { console.warn('[GpsPage] headingThrottleSub unsubscribe failed', e); }
   headingThrottleSub = null;
-  try { loc.detach(); } catch {}
+  try { loc.detach(); } catch { }
   // Do not stop the global stream here; other tabs may use it concurrently.
 });
 
 // compassMode persists via prefs store actions
 
-watch(selectedTrailId, async (id) =>
-{
-  if (id != null) await wps.loadForTrail(id);
-});
+/** Watch selected trail and load its waypoints when it changes. */
+watch(selectedTrailId, async (id) => { if (id != null) await wps.loadForTrail(id); });
 
 // Feed location to native Heading plugin for true north declination
+/** Provide latest position to the compass plugin for declination (true north). */
 watch(() => gps.value, async (pos) =>
 {
-  if (!pos) return;
-  if (isWeb) return;
-  try
-  {
-    console.info('[Heading] setLocation ->', pos.lat, pos.lon, pos.altitude ?? undefined);
-    await compassStream.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
-  }
+  if (!pos || isWeb) return;
+  try { await compassStream.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined }); }
   catch (e) { console.warn('[Heading] setLocation error', e); }
 });
 
 // --- Permissions helper and local subscription handle ---
+/** Request/check geolocation permission; allow in web dev. */
 async function ensurePermissions (): Promise<boolean>
 {
   try

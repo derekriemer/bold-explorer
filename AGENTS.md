@@ -24,12 +24,7 @@ Run from `bold_explorer/` and use pnpm:
 
 ## Coding Style & Naming Conventions
 
-- Language: TypeScript + Vue 3 SFCs (`<script setup lang="ts">`).
-- Indentation: 2 spaces; keep lines focused and readable.
-- Components/views: PascalCase file names (e.g., `TabsPage.vue`, `Tab1Page.vue`).
-- Imports: Use alias `@` for `src/` (e.g., `@/views/Tab1Page.vue`).
-- Lint rules: Vue 3 essential + TypeScript recommended; fix warnings before submitting.
-- Types: Avoid using the `any` type unless absolutely necessary, ask an expert user for typing help if you require it.
+See STYLE_GUIDE.md for project‑wide style and page organization guidance (imports order, stores/state/computed layout, RxJS patterns, and accessibility notes).
 
 ## Testing Guidelines
 

@@ -45,9 +45,10 @@ class LocationStream
 
     constructor(provider?: LocationProvider)
     {
-        this.provider = provider ?? providerRegistry.get('geolocation');
+        const active = provider ?? providerRegistry.getActiveProvider();
+        this.provider = active;
         // React to registry changes by swapping provider and preserving watch state
-        providerRegistry.onChange((p) => { this.swapProvider(p); });
+        providerRegistry.active$.subscribe(({ provider: p }) => { this.swapProvider(p); });
     }
 
     /** Swap in a new provider (e.g., BackgroundProvider, MockProvider). */

@@ -1,31 +1,68 @@
 import type { LocationProvider, ProviderKind } from '@/types';
 import { GeolocationProvider, FakeableProvider, ReplayProvider, type ReplayPoint } from './providers';
+import { BehaviorSubject } from 'rxjs';
 
-type Listener = (provider: LocationProvider, kind: ProviderKind) => void;
+type ProviderState = { kind: ProviderKind; provider: LocationProvider };
 
 class ProviderRegistry
 {
   private instances: Partial<Record<ProviderKind, LocationProvider>> = {};
-  private activeKind: ProviderKind = 'geolocation';
-  private listeners: Set<Listener> = new Set();
   private replayPoints: ReplayPoint[] = [];
+
+  private readonly state$: BehaviorSubject<ProviderState>;
+
+  constructor()
+  {
+    const initialProvider = this.instantiate('geolocation');
+    this.state$ = new BehaviorSubject<ProviderState>({ kind: 'geolocation', provider: initialProvider });
+  }
+
+  /** Observable stream of the active provider state. */
+  get active$ () { return this.state$.asObservable(); }
+
+  /** Get the current active kind. */
+  getActiveKind (): ProviderKind { return this.state$.getValue().kind; }
+
+  /** Get the current active provider instance. */
+  getActiveProvider (): LocationProvider { return this.state$.getValue().provider; }
+
+  /** Return current state (kind + provider). */
+  getActive (): ProviderState { return this.state$.getValue(); }
 
   /** Provide points used when constructing a replay provider. */
   setReplayPoints (points: ReplayPoint[])
   {
     this.replayPoints = points.slice();
-    // If a replay provider already exists, rebuild it to reflect new points if active in future
+    // Rebuild replay provider so future switches get fresh data
     if (this.instances.replay)
     {
       delete this.instances.replay;
+      // If currently active kind is replay, immediately swap to a fresh instance
+      if (this.getActiveKind() === 'replay')
+      {
+        const fresh = this.instantiate('replay');
+        this.state$.next({ kind: 'replay', provider: fresh });
+      }
     }
   }
 
-  /** Get the current active kind. */
-  getActiveKind (): ProviderKind { return this.activeKind; }
-
-  /** Get or construct a provider instance for a kind. */
+  /** Get or construct a provider instance for a kind (does not switch active). */
   get (kind: ProviderKind): LocationProvider
+  {
+    return this.instantiate(kind);
+  }
+
+  /** Switch the active provider kind and emit via Rx. */
+  switchTo (kind: ProviderKind): LocationProvider
+  {
+    const cur = this.state$.getValue();
+    if (cur.kind === kind) return cur.provider;
+    const p = this.instantiate(kind);
+    this.state$.next({ kind, provider: p });
+    return p;
+  }
+
+  private instantiate (kind: ProviderKind): LocationProvider
   {
     if (this.instances[kind]) return this.instances[kind]!;
     switch (kind)
@@ -36,25 +73,6 @@ class ProviderRegistry
       case 'background': this.instances[kind] = new GeolocationProvider(); break; // placeholder
     }
     return this.instances[kind]!;
-  }
-
-  /** Switch the active provider kind. Notifies listeners. */
-  switchTo (kind: ProviderKind): LocationProvider
-  {
-    if (this.activeKind === kind) return this.get(kind);
-    this.activeKind = kind;
-    const p = this.get(kind);
-    for (const l of this.listeners) l(p, kind);
-    return p;
-  }
-
-  /** Subscribe to provider change events (kind + instance). */
-  onChange (fn: Listener): () => void
-  {
-    this.listeners.add(fn);
-    // Emit current immediately to hydrate subscribers
-    try { fn(this.get(this.activeKind), this.activeKind); } catch {}
-    return () => { this.listeners.delete(fn); };
   }
 }
 

@@ -168,8 +168,8 @@ const actions = useActions();
 const isWeb = Capacitor.getPlatform() === 'web';
 // Compass via composable (throttled to 1 Hz)
 const compass = useCompass({ throttleMs: 1000, initialMode: prefs.compassMode, autoStart: false });
-const compassHeadingText = compass.headingText;
 const compassModeLabel = compass.modeLabel;
+const compassHeadingText = compass.headingText;
 
 // Derived UI values via composables
 const { trueNorthBearingDeg, userBearingText, distanceM } = useBearingDistance({

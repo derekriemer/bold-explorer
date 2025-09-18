@@ -32,6 +32,7 @@ See STYLE_GUIDE.md for project‑wide style and page organization guidance (impo
 - E2E tests: add Cypress specs under `tests/e2e/specs/`, name `*.cy.ts`.
 - Run locally: `pnpm test:unit` and `pnpm test:e2e`.
 - Aim for meaningful assertions (rendered text, route changes, and component behavior). Keep tests fast and deterministic.
+- Reference testing_plan.md when needed to determine if the feature you are working on has tests yet.
 
 ## Commit & Pull Request Guidelines
 
@@ -71,7 +72,7 @@ MSG
 
 ## Agent-Specific Instructions
 
-- When collaborating live with the user, commit after each discrete bug fix, feature, or chore.
+- When collaborating live with the user, offer to commit after each discrete bug fix, feature, or chore.
 - Treat a prompt starting with `BUG:`, `FEAT:`, or `CHORE:` as a strong hint to commit using the matching Conventional Commit type (`fix:`, `feat:`, `chore:`).
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
 - Example:
@@ -95,7 +96,7 @@ MSG
 - Use `aria-label` only when there is no visible text (e.g., icon-only buttons) or when additional clarification is required for assistive tech. Keep it short and consistent with the visual purpose.
 - If a nearby text node is the label, prefer `aria-labelledby` referencing that text rather than duplicating with `aria-label`.
 - Keep the accessible name in sync with the UI. Avoid mismatches like a button that visually reads “Compass (True)” but announces a different label.
-- Always avoid changing labels mixed with stateful controls. For example, a mute checkbox, that says mute when unchecked and unmute when checked. having to keep track of two states is very confusing for the user.
+- Always avoid controls that change their labels mixed with state changes. For example, a mute checkbox, that says mute when unchecked and unmute when checked. having to keep track of two states is very confusing for the user.
 - Do not duplicate the visible text with `aria-label`; it’s redundant and may confuse screen readers. Let the visible text be the accessible name by default.
 
 ### Testing TODOs

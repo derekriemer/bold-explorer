@@ -4,7 +4,7 @@ Offline‑first waypoint/trail app built with Ionic Vue, Pinia, and SQLite via C
 
 ## Overview
 
-Bold Explorer is a trail and waypoint recorder designed to work fully offline.
+Bold Explorer is a trail and waypoint navigation app for the blind designed to work fully offline.
 
 - GPS HUD with compass (Magnetic/True), bearing and distance to target, and Follow‑Trail mode that advances to the next waypoint.
 - “Record New Trail” callout on GPS when Trail scope selected; FAB “+” records waypoints to a trail or standalone based on scope.
@@ -12,9 +12,9 @@ Bold Explorer is a trail and waypoint recorder designed to work fully offline.
 - Trails: create/rename/delete; manage ordered waypoints (attach existing via wizard, add new, move up/down, detach); export to GPX.
 - Collections: group waypoints and trails; bulk add via Multi‑Select Wizard; export to GPX.
 - Settings: units, compass mode, audio cues; Debug page for diagnostics. Sticky header provides quick Settings/Debug.
-- Tech: Ionic Vue + Pinia; SQLite via Kysely; DI via Pinia plugin; Capacitor for Filesystem/Preferences/Geolocation/Heading.
+- Tech: Ionic Vue + Pinia; SQLite via Kysely; DI via Pinia plugin; Capacitor for Filesystem/Preferences/Geolocation/Heading. Works on android and organization works on web, in theory works on IOS.
 
-See `WAYPOINT_TRAIL_SPEC.md` for the storage‑first architecture and detailed behavior.
+See `WAYPOINT_TRAIL_SPEC.md` for the architecture and detailed behavior.
 
 ## Style Guide
 
@@ -29,6 +29,7 @@ For page organization, coding conventions, and RxJS patterns, see the project St
   - composables: Small utilities used in components or pages that make doing things possible, have their own lifecycle hooks from vue.
   - `db/`: Kysely schema, migrations provider, DB factory (`createAppDb`, `createTestDb`, `initAppDb`). Some DB helpers exist for native and web based testing, for various reasons.
   - `data/repositories/`: Trails, Waypoints, Collections, Auto-Waypoints (transactional, position logic).
+  - data/streams: streams that can be used to hook into data sources. These are build with rxjs. Providers provide data to a stream using a light weight interface.
   - data/ stores: Storage utilities like file writing, and services for gpx handling.
   - `plugins/`: Repositories DI plugin (provides `$repos` to Pinia stores).
   - `stores/`: `useTrails`, `useWaypoints`, `useCollections` (no SQL in stores/pages).
@@ -62,12 +63,17 @@ For page organization, coding conventions, and RxJS patterns, see the project St
 
 ## Android (Capacitor)
 
-- Add Android platform (one-time):
-  - `pnpm exec cap add android`
+You need to first install an android toolchain. Once installed the following should work.
+
+- The author recommends also installing or making gradel available on the path. This enables pnpm cap build android, or pnpm cap run android to work.
+- If not using android studio's runtime tools, you need to make sure you are using the jre android toolchains need, which is _not_ the latest jdk from Oracle. As of September 2025, that's jdk17.
+
+useful commands:
+
 - Build web and sync native:
   - `pnpm build`
   - `pnpm cap sync android`
-- Open in Android Studio:
+- Open in Android Studio: (author does not open it this way, but it may work on your platform)
   - `pnpm cap open android`
 
 Notes
@@ -94,10 +100,10 @@ Recommended test patterns (from the spec):
 
 ## Design Spec
 
-- The storage‑first design is in `WAYPOINT_TRAIL_SPEC.md` (schema, migrations, repo APIs, UI expectations). Update the spec to reflect the latest code as the project evolves.
+- The design is in `WAYPOINT_TRAIL_SPEC.md` (schema, migrations, repo APIs, UI expectations). Update the spec to reflect the latest code as the project evolves.
 
 ## Troubleshooting
 
 - Rollup optional binary errors across environments: remove `node_modules`, ensure you’re in the target environment (Windows vs WSL), and run `pnpm install` again.
 - We need to pin some specific versions to get capacitor to work correctly, ensure your package manager handles the overrides.
-- Native typings: add `@types/better-sqlite3` if TypeScript complains about the driver type in tests.
+- Native typings: If working on a test using native db, add `@types/better-sqlite3` if TypeScript complains about the driver type in tests.

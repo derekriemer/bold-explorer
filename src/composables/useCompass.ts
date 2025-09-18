@@ -1,25 +1,42 @@
-import { ref, computed, onBeforeUnmount, onMounted, type Ref } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
+import type { Subscription } from 'rxjs';
+import { throttleTime } from 'rxjs/operators';
 import { compassStream } from '@/data/streams/compass';
 import type { HeadingReading } from '@/plugins/heading';
-import { throttleTime } from 'rxjs/operators';
+
+type CompassMode = 'true' | 'magnetic';
 
 /**
  * Encapsulate compassStream lifecycle + formatting.
  * - Starts/stops the underlying compass stream.
  * - Applies optional throttling for UI updates.
- * - Exposes heading as degrees and text and allows toggling true vs magnetic north.
+ * - Exposes heading as degrees/text and manages true vs magnetic north.
  */
-export function useCompass (opts?: { throttleMs?: number; initialMode?: 'true' | 'magnetic'; autoStart?: boolean })
+export function useCompass (opts?: { throttleMs?: number; initialMode?: CompassMode; autoStart?: boolean })
 {
   const throttleMs = opts?.throttleMs ?? 1000;
-  const northType = ref<'true' | 'magnetic'>(opts?.initialMode ?? 'true');
+  const mode = ref<CompassMode>(opts?.initialMode ?? 'true');
+  const reading = ref<HeadingReading | null>(null);
 
-  const mag = ref<number | null>(null);
-  const tru = ref<number | null>(null);
+  let sub: Subscription | null = null;
 
-  let sub: import('rxjs').Subscription | null = null;
-
-  const headingDeg = computed<number | null>(() => (northType.value === 'true' ? tru.value : mag.value));
+  const headingDeg = computed<number | null>(() =>
+  {
+    const r = reading.value;
+    if (!r)
+    {
+      return null;
+    }
+    if (mode.value === 'true' && typeof r.true === 'number')
+    {
+      return normalizeHeading(r.true);
+    }
+    if (typeof r.magnetic === 'number')
+    {
+      return normalizeHeading(r.magnetic);
+    }
+    return null;
+  });
 
   const headingText = computed(() =>
   {
@@ -30,18 +47,40 @@ export function useCompass (opts?: { throttleMs?: number; initialMode?: 'true' |
     return `${ dirs[idx] } ${ h.toFixed(0) }°`;
   });
 
+  const modeLabel = computed(() =>
+    `Compass: ${ mode.value === 'true' ? 'TRUE' : 'MAGNETIC' } North`
+  );
+
+  const hasTrueNorth = computed(() => typeof reading.value?.true === 'number');
+
+  async function setMode (next: CompassMode): Promise<void>
+  {
+    if (mode.value === next) return;
+    mode.value = next;
+    if (compassStream.isActive())
+    {
+      await compassStream.setTrueNorth(next === 'true');
+    }
+  }
+
+  async function toggleMode (): Promise<CompassMode>
+  {
+    const next: CompassMode = mode.value === 'true' ? 'magnetic' : 'true';
+    await setMode(next);
+    return mode.value;
+  }
+
   async function start (): Promise<void>
   {
-    if (!compassStream.isActive()) await compassStream.start({ useTrueNorth: northType.value === 'true' });
-    // (re)subscribe
+    if (!compassStream.isActive())
+    {
+      await compassStream.start({ useTrueNorth: mode.value === 'true' });
+    }
     try { sub?.unsubscribe(); } catch {}
-    sub = compassStream.updates
-      .pipe(throttleMs > 0 ? throttleTime(throttleMs) : (x: any) => x)
-      .subscribe((r: HeadingReading) =>
-      {
-        mag.value = typeof (r as any)?.magnetic === 'number' ? (r as any).magnetic : null;
-        tru.value = typeof (r as any)?.true === 'number' ? (r as any).true : null;
-      });
+    const source = throttleMs > 0
+      ? compassStream.updates.pipe(throttleTime(throttleMs))
+      : compassStream.updates;
+    sub = source.subscribe((r: HeadingReading) => { reading.value = r; });
   }
 
   async function stop (): Promise<void>
@@ -51,21 +90,39 @@ export function useCompass (opts?: { throttleMs?: number; initialMode?: 'true' |
     await compassStream.stop();
   }
 
-  async function toggleTrueNorth (): Promise<void>
+  async function setLocation (coords: { lat: number; lon: number; alt?: number }): Promise<void>
   {
-    northType.value = northType.value === 'true' ? 'magnetic' : 'true';
-    await compassStream.setTrueNorth(northType.value === 'true');
+    try { await compassStream.setLocation(coords); }
+    catch (e) { console.warn('[useCompass] setLocation failed', e); }
   }
 
   if (opts?.autoStart)
   {
     onMounted(() => { void start(); });
     onBeforeUnmount(() => { void stop(); });
-  } else
+  }
+  else
   {
     onBeforeUnmount(() => { try { sub?.unsubscribe(); } catch {}; sub = null; });
   }
 
-  return { mag, tru, northType, headingDeg, headingText, start, stop, toggleTrueNorth } as const;
+  return {
+    mode,
+    headingDeg,
+    headingText,
+    modeLabel,
+    hasTrueNorth,
+    start,
+    stop,
+    setMode,
+    toggleMode,
+    setLocation
+  } as const;
 }
 
+function normalizeHeading (deg: number): number
+{
+  if (!Number.isFinite(deg)) return deg;
+  const mod = ((deg % 360) + 360) % 360;
+  return mod;
+}

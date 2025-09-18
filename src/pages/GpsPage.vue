@@ -64,10 +64,10 @@
               <div v-if="!isWeb" class="telemetry-item">
                 <div class="label">
                   <ion-button fill="clear" size="small" class="compass-toggle" @click=" toggleCompassMode ">
-                    {{ compassLabel }}
+                    {{ compassModeLabel }}
                   </ion-button>
                 </div>
-                <div class="value">{{ compassText }}</div>
+                <div class="value">{{ compassHeadingText }}</div>
               </div>
               <div v-if="targetCoord" class="telemetry-item">
                 <div class="label">{{ bearingLabel }}</div>
@@ -113,7 +113,6 @@ import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
 import { useLocation } from '@/stores/useLocation';
-import { compassStream } from '@/data/streams/compass';
 import { useCompass } from '@/composables/useCompass';
 import { useTarget } from '@/composables/useTarget';
 import { useBearingDistance } from '@/composables/useBearingDistance';
@@ -169,16 +168,17 @@ const actions = useActions();
 const isWeb = Capacitor.getPlatform() === 'web';
 // Compass via composable (throttled to 1 Hz)
 const compass = useCompass({ throttleMs: 1000, initialMode: prefs.compassMode, autoStart: false });
+const compassHeadingText = compass.headingText;
+const compassModeLabel = compass.modeLabel;
 
 // Derived UI values via composables
 const { trueNorthBearingDeg, userBearingText, distanceM } = useBearingDistance({
   gps: gpsLatLng,
   target: targetCoord,
-  headingDeg: computed(() => compass.headingDeg.value),
+  headingDeg: compass.headingDeg,
   units: computed(() => prefs.units)
 });
 const bearingDisplay = computed(() => userBearingText.value);
-const compassHeadingDeg = computed(() => compass.headingDeg.value);
 /** Human‑readable target name for bearing label. */
 const bearingTargetName = computed(() =>
 {
@@ -194,16 +194,6 @@ const bearingTargetName = computed(() =>
   return null;
 });
 const bearingLabel = computed(() => bearingTargetName.value ? `Bearing to ${ bearingTargetName.value }` : 'Bearing');
-/** UI display string for heading. */
-const compassText = computed(() =>
-{
-  const h = compassHeadingDeg.value;
-  if (h == null) return '—';
-  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  const idx = Math.round(h / 22.5) % 16;
-  return `${ dirs[idx] } ${ h.toFixed(0) }°`;
-});
-const compassLabel = computed(() => `Compass: ${ prefs.compassMode.toLocaleUpperCase() } North`);
 // Distance formatting inline (feet/miles thresholds: 5280 ft = 1 mi)
 /** UI display string for distance using selected units. */
 const distanceDisplay = computed(() =>
@@ -274,9 +264,8 @@ async function recordNewTrail ()
 /** Toggle true vs magnetic north without restarting the compass stream. */
 async function toggleCompassMode ()
 {
-  const next = prefs.compassMode === 'true' ? 'magnetic' : 'true';
+  const next = await compass.toggleMode();
   await prefs.setCompassMode(next);
-  try { await compassStream.setTrueNorth(next === 'true'); } catch (e) { console.warn('[GpsPage] setTrueNorth failed', e); }
 }
 
 
@@ -344,6 +333,10 @@ onBeforeUnmount(() =>
 });
 
 // compassMode persists via prefs store actions
+watch(
+  () => prefs.compassMode,
+  (mode) => { void compass.setMode(mode); }
+);
 
 /** Watch selected trail and load its waypoints when it changes. */
 watch(selectedTrailId, async (id) => { if (id != null) await wps.loadForTrail(id); });
@@ -353,8 +346,7 @@ watch(selectedTrailId, async (id) => { if (id != null) await wps.loadForTrail(id
 watch(() => gps.value, async (pos) =>
 {
   if (!pos || isWeb) return;
-  try { await compassStream.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined }); }
-  catch (e) { console.warn('[Heading] setLocation error', e); }
+  await compass.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
 });
 
 // no gpsSub; store handles subscription lifecycle

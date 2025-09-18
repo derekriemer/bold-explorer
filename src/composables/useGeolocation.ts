@@ -1,6 +1,8 @@
 import { ref, onBeforeUnmount, onMounted } from 'vue';
 import { Geolocation, type Position, type PositionOptions } from '@capacitor/geolocation';
 
+type ExtendedPositionOptions = PositionOptions & { minimumUpdateInterval?: number };
+
 type Fix = {
   lat: number;
   lon: number;
@@ -21,10 +23,11 @@ export function useGeolocation ()
   let settleUntil = 0;
 
   // Defaults that keep GPS "hot" and avoid cached/coarse fixes
-  const DEFAULT_OPTS: PositionOptions = {
+  const DEFAULT_OPTS: ExtendedPositionOptions = {
     enableHighAccuracy: true,
     maximumAge: 0,
-    timeout: 45000
+    timeout: 30000,
+    minimumUpdateInterval: 1000,
   };
 
   const toCoords = (pos: Position): Fix => ({
@@ -46,7 +49,7 @@ export function useGeolocation ()
   async function recenter (options?: PositionOptions)
   {
     console.debug('[useGeolocation] recenter()', { options });
-    const opts = { ...DEFAULT_OPTS, ...(options ?? {}) };
+    const opts: ExtendedPositionOptions = { ...DEFAULT_OPTS, ...(options ?? {}) };
     try
     {
       const pos = await Geolocation.getCurrentPosition(opts);
@@ -90,7 +93,7 @@ export function useGeolocation ()
 
     const minAccuracyM = opts?.minAccuracyM ?? 10;  // 10 m ≈ 33 ft
     const settleMs = opts?.settleMs ?? 15000;       // give GNSS time to converge
-    const options = { ...DEFAULT_OPTS, ...(opts?.options ?? {}) };
+    const options: ExtendedPositionOptions = { ...DEFAULT_OPTS, ...(opts?.options ?? {}) };
 
     // Settle window bookkeeping
     best.value = null;

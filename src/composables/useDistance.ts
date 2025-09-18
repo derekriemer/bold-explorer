@@ -1,5 +1,6 @@
 import { computed, type Ref } from 'vue';
 import { haversineDistanceMeters } from '@/utils/geo';
+import { isLatLng, toLatLng, type LatLng } from '@/types';
 
 export type Units = 'metric' | 'imperial';
 
@@ -13,13 +14,24 @@ export function formatDistance(distanceM: number | null, units: Units): string {
   return distanceM >= 1000 ? `${(distanceM / 1000).toFixed(2)} km` : `${distanceM.toFixed(0)} m`;
 }
 
-export function useDistance(position: Ref<{ lat: number; lon: number } | null>, units: Ref<Units>) {
-  const distanceTo = (target: { lat: number; lon: number } | null): number | null =>
-    position.value && target ? haversineDistanceMeters(position.value, target) : null;
+type CoordInput = LatLng | { lat: number; lon: number };
 
-  const sorterFrom = (center: { lat: number; lon: number }) =>
-    (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
-      haversineDistanceMeters(center, a) - haversineDistanceMeters(center, b);
+function toSafeLatLng(value: CoordInput): LatLng
+{
+  return isLatLng(value) ? value : toLatLng(value.lat, value.lon);
+}
+
+export function useDistance(position: Ref<LatLng | null>, units: Ref<Units>)
+{
+  const distanceTo = (target: CoordInput | null): number | null =>
+    position.value && target ? haversineDistanceMeters(position.value, toSafeLatLng(target)) : null;
+
+  const sorterFrom = (center: CoordInput) =>
+  {
+    const safeCenter = toSafeLatLng(center);
+    return (a: CoordInput, b: CoordInput) =>
+      haversineDistanceMeters(safeCenter, toSafeLatLng(a)) - haversineDistanceMeters(safeCenter, toSafeLatLng(b));
+  };
 
   const format = (d: number | null) => formatDistance(d, units.value);
 

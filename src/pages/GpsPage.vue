@@ -100,18 +100,7 @@
   </ion-page>
 </template>
 <script setup lang="ts">
-/**
- * GPS Page script layout
- * 1) Imports
- * 2) Types
- * 3) Stores/services and platform flags
- * 4) UI state (refs)
- * 5) Derived state (computed)
- * 6) Actions/handlers
- * 7) Lifecycle
- * 8) Watches
- * 9) Helpers
- */
+
 import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
@@ -131,12 +120,12 @@ import { useBearingDistance } from '@/composables/useBearingDistance';
 import { useWaypointActions } from '@/composables/useWaypointActions';
 import { ensureLocationGranted } from '@/composables/usePermissions';
 import { useFollowTrail } from '@/composables/useFollowTrail';
-import { haversineDistanceMeters, initialBearingDeg } from '@/utils/geo';
 import { usePrefsStore } from '@/stores/usePrefs';
 import { useActions } from '@/composables/useActions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { Heading } from '@/plugins/heading';
+import { toLatLng } from '@/types';
 
 /** Page scope selection: operate on a waypoint or a trail. */
 type Scope = 'waypoint' | 'trail';
@@ -155,7 +144,6 @@ const target = useTarget({ waypoints: waypointsNamed, trailWaypoints });
 const scope = target.scope;
 const selectedWaypointId = target.selectedWaypointId;
 const targetCoord = target.targetCoord;
-const targetName = target.targetName;
 
 const loc = useLocation();
 /** Latest location sample exposed in a convenient shape for the UI. */
@@ -169,10 +157,11 @@ const gps = computed(() => loc.current ? {
   ts: (loc.current as any).timestamp ?? null
 } : null);
 
+const gpsLatLng = computed(() => (gps.value ? toLatLng(gps.value.lat, gps.value.lon) : null));
+
 /** Current trail’s waypoints in a minimal form for Follow‑Trail logic. */
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
-  //codex: brace function
-  useFollowTrail(trailWaypoints, computed(() => gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null));
+  useFollowTrail(trailWaypoints, gpsLatLng);
 
 const prefs = usePrefsStore();
 const actions = useActions();
@@ -182,16 +171,16 @@ const isWeb = Capacitor.getPlatform() === 'web';
 const compass = useCompass({ throttleMs: 1000, initialMode: prefs.compassMode, autoStart: false });
 
 // Derived UI values via composables
-const { trueNorthBearingDeg, userBearingText, distanceM, distanceText } = useBearingDistance({
-  gps: computed(() => (gps.value ? { lat: gps.value.lat, lon: gps.value.lon } : null)),
-  target: computed(() => targetCoord.value),
+const { trueNorthBearingDeg, userBearingText, distanceM } = useBearingDistance({
+  gps: gpsLatLng,
+  target: targetCoord,
   headingDeg: computed(() => compass.headingDeg.value),
   units: computed(() => prefs.units)
 });
 const bearingDisplay = computed(() => userBearingText.value);
 const compassHeadingDeg = computed(() => compass.headingDeg.value);
 /** Human‑readable target name for bearing label. */
-const targetName = computed(() =>
+const bearingTargetName = computed(() =>
 {
   if (scope.value === 'waypoint')
   {
@@ -204,7 +193,7 @@ const targetName = computed(() =>
   }
   return null;
 });
-const bearingLabel = computed(() => targetName.value ? `Bearing to ${ targetName.value }` : 'Bearing');
+const bearingLabel = computed(() => bearingTargetName.value ? `Bearing to ${ bearingTargetName.value }` : 'Bearing');
 /** UI display string for heading. */
 const compassText = computed(() =>
 {
@@ -349,7 +338,7 @@ onMounted(async () =>
 // Lifecycle — unmount: detach page‑level subscriptions only
 onBeforeUnmount(() =>
 {
-  try { void compass.stop(); } catch {}
+  try { void compass.stop(); } catch { }
   try { loc.detach(); } catch { }
   // Do not stop the global stream here; other tabs may use it concurrently.
 });

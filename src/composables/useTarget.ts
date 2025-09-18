@@ -1,13 +1,19 @@
 import { ref, computed, type Ref } from 'vue';
+import { isLatLng, toLatLng, type LatLng } from '@/types';
 
-type Coord = { lat: number; lon: number };
-type NamedCoord = Coord & { id: number; name: string };
+type CoordInput = LatLng | { lat: number; lon: number };
+type NamedCoord = CoordInput & { id: number; name: string };
 export type Scope = 'waypoint' | 'trail';
 
 /**
  * Manage target selection between a single waypoint and the next waypoint in a trail.
  * Accepts sources for waypoints and trail waypoints and computes a single target.
  */
+function toSafeLatLng(coord: CoordInput): LatLng
+{
+  return isLatLng(coord) ? coord : toLatLng(coord.lat, coord.lon);
+}
+
 export function useTarget (args: {
   waypoints: Ref<NamedCoord[]>;
   trailWaypoints: Ref<NamedCoord[]>;
@@ -18,15 +24,15 @@ export function useTarget (args: {
   const selectedWaypointId = ref<number | null>(null);
   const selectedTrailId = ref<number | null>(null);
 
-  const targetCoord = computed<Coord | null>(() =>
+  const targetCoord = computed<LatLng | null>(() =>
   {
     if (scope.value === 'waypoint')
     {
       const t = args.waypoints.value.find(w => w.id === selectedWaypointId.value);
-      return t ? { lat: t.lat, lon: t.lon } : null;
+      return t ? toSafeLatLng(t) : null;
     }
     const t = args.trailWaypoints.value[0] ?? null; // caller may override with follow‑trail index
-    return t ? { lat: t.lat, lon: t.lon } : null;
+    return t ? toSafeLatLng(t) : null;
   });
 
   const targetName = computed<string | null>(() =>
@@ -50,4 +56,3 @@ export function useTarget (args: {
     clear
   } as const;
 }
-

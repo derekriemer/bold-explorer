@@ -101,6 +101,7 @@ import { parseCenterParam } from '@/utils/locationParam';
 import { useActions } from '@/composables/useActions';
 import type { Waypoint } from '@/db/schema';
 import { actionsService } from '@/services/actions.service';
+import { toLatLng, tryParseLatLng, type LatLng } from '@/types';
 
 const wps = useWaypoints();
 const trails = useTrails();
@@ -122,10 +123,10 @@ function toggleExpand (id: number)
 }
 
 // Distances composable: derive distance overlay & sort when active
-const centerOnRoute = computed<{ lat: number; lon: number } | null>(() => getCenterFromRoute());
+const centerOnRoute = computed<LatLng | null>(() => getCenterFromRoute());
 const { distances, byDistance, refresh: refreshDistances } = useWaypointDistances({
   waypoints: computed(() => wps.all as Selectable<Waypoint>[]),
-  gps: computed(() => loc.current ? { lat: loc.current.lat, lon: loc.current.lon } : null),
+  gps: computed(() => (loc.current ? toLatLng(loc.current.lat, loc.current.lon) : null)),
   throttleMs: 800,
   initialCenter: centerOnRoute.value
 });
@@ -320,15 +321,15 @@ onMounted(async () =>
   }
 });
 
-function getCenterFromRoute (): { lat: number; lon: number } | null
+function getCenterFromRoute (): LatLng | null
 {
-  const center = parseCenterParam(route.query.center as (string | string[] | undefined)) ?? (
-    route.query.lat != null && route.query.lon != null
-      ? { lat: Number(route.query.lat), lon: Number(route.query.lon) }
-      : null
-  );
-  if (center && Number.isFinite(center.lat) && Number.isFinite(center.lon)) return center;
-  return null;
+  const fromParam = parseCenterParam(route.query.center as (string | string[] | undefined));
+  const fromQuery = route.query.lat != null && route.query.lon != null
+    ? { lat: Number(route.query.lat), lon: Number(route.query.lon) }
+    : null;
+  const candidate = fromParam ?? fromQuery;
+  if (!candidate) return null;
+  return tryParseLatLng(candidate);
 }
 
 onIonViewWillEnter(async () =>

@@ -3,6 +3,7 @@ import type { Selectable } from 'kysely';
 import type { Waypoint } from '@/db/schema';
 import type { LatLng } from '@/types/latlng';
 import { haversineDistanceMeters } from '@/utils/geo';
+import { isLatLng, toLatLng } from '@/types';
 
 type Wp = Selectable<Waypoint>;
 
@@ -20,11 +21,17 @@ export function useWaypointDistances(opts: UseWaypointDistancesOptions) {
   const distances = ref<Record<number, number>>({});
   let timer: ReturnType<typeof setTimeout> | null = null;
 
+  function toSafeLatLng(value: LatLng | { lat: number; lon: number }): LatLng
+  {
+    return isLatLng(value) ? value : toLatLng(value.lat, value.lon);
+  }
+
   function compute(center: LatLng | null) {
     if (!center) return;
+    const safeCenter = toSafeLatLng(center);
     const map: Record<number, number> = {};
     for (const w of waypoints.value) {
-      map[w.id] = haversineDistanceMeters(center, { lat: w.lat, lon: w.lon });
+      map[w.id] = haversineDistanceMeters(safeCenter, toLatLng(w.lat, w.lon));
     }
     distances.value = map;
   }
@@ -77,4 +84,3 @@ export function useWaypointDistances(opts: UseWaypointDistancesOptions) {
 
   return { distances, byDistance, refresh } as const;
 }
-

@@ -1,5 +1,6 @@
 import { BehaviorSubject, Observable } from 'rxjs';
 import type { HeadingReading } from '@/plugins/heading';
+import type { CompassProvider } from '@/types/compass';
 import { compassProviderRegistry } from './providerRegistry';
 
 class CompassStream
@@ -19,16 +20,26 @@ class CompassStream
   async start (opts?: { useTrueNorth?: boolean }): Promise<void>
   {
     if (this.active) return;
-    const { provider } = compassProviderRegistry.getActive();
-    await provider.start((r) => { this.subject.next(r); }, (e) => { /* surface via logs later */ console.warn('[compass] provider error', e); });
+    const provider = compassProviderRegistry.getActiveProvider();
+    await provider.start(
+      (r: HeadingReading) => { this.subject.next(r); },
+      (e: unknown) => { /* surface via logs later */ console.warn('[compass] provider error', e); }
+    );
     this.active = true;
     this.lastUseTrue = opts?.useTrueNorth ?? true;
     await provider.setTrueNorth(this.lastUseTrue);
     // If provider switches while active, rewire without changing outward state
-    compassProviderRegistry.active$.subscribe(async ({ provider: p }) =>
+    compassProviderRegistry.active$.subscribe(async ({ provider: p }: { provider: CompassProvider }) =>
     {
       if (!this.active) return;
-      try { await p.start((r) => { this.subject.next(r); }, (e) => console.warn('[compass] provider error', e)); await p.setTrueNorth(this.lastUseTrue); }
+      try
+      {
+        await p.start(
+          (r: HeadingReading) => { this.subject.next(r); },
+          (e: unknown) => console.warn('[compass] provider error', e)
+        );
+        await p.setTrueNorth(this.lastUseTrue);
+      }
       catch (e) { console.warn('[compass] swap failed', e); }
     });
   }

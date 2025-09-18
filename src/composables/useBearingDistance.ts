@@ -1,13 +1,12 @@
 import { computed, type Ref } from 'vue';
 import { initialBearingDeg, haversineDistanceMeters } from '@/utils/geo';
 import { formatDistance, type Units } from './useDistance';
-
-type Coord = { lat: number; lon: number };
+import type { LatLng } from '@/types';
 
 /** Map an absolute bearing (0..360) to a cardinal text. */
 function toCardinal (deg: number): string
 {
-  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const idx = Math.round(((deg % 360) + 360) % 360 / 22.5) % 16;
   return dirs[idx];
 }
@@ -15,8 +14,8 @@ function toCardinal (deg: number): string
 /** Map a relative bearing (−180..180) to a clock position label (12,1,…,11 o'clock). */
 function toClock (rel: number): string
 {
-  const ang = ((rel + 360) % 360); // 0..360
-  const hour = Math.round(ang / 30) % 12; // 0..11
+  const angle = ((rel + 360) % 360); // 0..360
+  const hour = Math.round(angle / 30) % 12; // 0..11
   const label = hour === 0 ? 12 : hour;
   return `${ label } o'clock`;
 }
@@ -37,8 +36,8 @@ function deltaAngle (fromDeg: number, toDeg: number): number
  * - distanceM/distanceText: meters and formatted string based on units.
  */
 export function useBearingDistance (args: {
-  gps: Ref<Coord | null>;
-  target: Ref<Coord | null>;
+  gps: Ref<LatLng | null>;
+  target: Ref<LatLng | null>;
   headingDeg?: Ref<number | null>;
   units: Ref<Units>;
 })
@@ -77,4 +76,3 @@ export function useBearingDistance (args: {
 
   return { trueNorthBearingDeg, relativeBearingDeg, userBearingText, clockBearingText, distanceM, distanceText } as const;
 }
-

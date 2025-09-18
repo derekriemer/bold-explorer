@@ -6,64 +6,52 @@
         <PageHeaderToolbar />
       </ion-toolbar>
       <ion-toolbar>
-        <ion-segment v-model=" scope " aria-label="Selection scope">
+        <ion-segment v-model="scope" aria-label="Selection scope">
           <ion-segment-button value="waypoint">
             <ion-label>Waypoint</ion-label>
           </ion-segment-button>
           <ion-segment-button value="trail">
             <ion-label>Trail</ion-label>
           </ion-segment-button>
+          <ion-segment-button value="collection">
+            <ion-label>Collection</ion-label>
+          </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
     </ion-header>
     <ion-content>
       <div class="ion-padding">
-        <ion-item v-if="scope === 'waypoint'">
-          <ion-label>Waypoint</ion-label>
-          <ion-select v-model=" selectedWaypointId " interface="popover" placeholder="None selected">
-            <ion-select-option v-for="wp in waypointsAll" :key=" wp.id " :value=" wp.id ">{{ wp.name
-            }}</ion-select-option>
-          </ion-select>
-          <ion-button slot="end" fill="clear" color="medium" v-if="selectedWaypointId != null"
-            @click=" clearWaypoint ">Clear</ion-button>
-        </ion-item>
-
-        <template v-else>
-          <ion-item>
-            <ion-label>Trail</ion-label>
-            <ion-select v-model=" selectedTrailId " interface="popover">
-              <ion-select-option v-for="t in trails.list" :key=" t.id " :value=" t.id ">{{ t.name }}</ion-select-option>
-            </ion-select>
-          </ion-item>
-          <ion-card v-if="!selectedTrailId" class="ion-margin-top">
-            <ion-card-content>
-              <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px;">
-                <div>
-                  <div style="font-weight:600; margin-bottom:4px;">Start a new trail</div>
-                  <div style="color: var(--ion-color-medium);">Record waypoints as you move. The + button adds points to
-                    this trail.</div>
-                </div>
-                <ion-button color="primary" @click=" recordNewTrail ">Record New Trail</ion-button>
-              </div>
-            </ion-card-content>
-          </ion-card>
-          <ion-item v-if="selectedTrailId">
-            <ion-label>
-              <div>Current: {{ active && next ? currentIndex + 1 : '-' }}</div>
-              <div>Next: {{ next?.name ?? '-' }}</div>
-            </ion-label>
-            <ion-button fill="outline" size="small" @click=" toggleFollow ">
-              {{ active ? 'Stop' : 'Start' }}
-            </ion-button>
-          </ion-item>
-        </template>
+        <GpsScopePanel
+          :scope="scope"
+          :waypoint="{ selectedId: selectedWaypointId, options: waypointOptions }"
+          :trail="{
+            selectedId: selectedTrailId,
+            options: trailOptions,
+            followState: trailFollowState
+          }"
+          :collection="{
+            selectedId: selectedCollectionId,
+            options: collectionOptions,
+            isEmpty: collectionWaypoints.length === 0
+          }"
+          @update:waypoint-id="id => selectedWaypointId = id"
+          @update:trail-id="id => selectedTrailId = id"
+          @update:collection-id="id => selectedCollectionId = id"
+          @record-new-trail="recordNewTrail"
+          @toggle-follow="toggleFollow"
+        />
 
         <ion-card>
           <ion-card-content>
             <div class="telemetry">
               <div v-if="!isWeb" class="telemetry-item">
                 <div class="label">
-                  <ion-button fill="clear" size="small" class="compass-toggle" @click=" toggleCompassMode ">
+                  <ion-button
+                    fill="clear"
+                    size="small"
+                    class="compass-toggle"
+                    @click="toggleCompassMode"
+                  >
                     {{ compassModeLabel }}
                   </ion-button>
                 </div>
@@ -81,71 +69,102 @@
           </ion-card-content>
         </ion-card>
 
-        <PositionReadout :lat=" gps?.lat ?? null " :lon=" gps?.lon ?? null " :elev_m=" gps?.altitude ?? null "
-          :accuracy=" gps?.accuracy ?? null " :units=" prefs.units " />
+        <PositionReadout
+          :lat="gps?.lat ?? null"
+          :lon="gps?.lon ?? null"
+          :elev_m="gps?.altitude ?? null"
+          :accuracy="gps?.accuracy ?? null"
+          :units="prefs.units"
+        />
 
         <div class="controls">
-          <ion-button @click=" recenter ">Recenter/Calibrate</ion-button>
+          <ion-button @click="recenter">Recenter/Calibrate</ion-button>
         </div>
 
         <div class="sr-only" aria-live="polite">{{ announcement }}</div>
-
-
       </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button @click=" markWaypoint " aria-label="Mark waypoint">+</ion-fab-button>
+        <ion-fab-button @click="markWaypoint" aria-label="Mark waypoint">+</ion-fab-button>
       </ion-fab>
     </ion-content>
   </ion-page>
 </template>
-<script setup lang="ts">
 
-import
-{
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonSegment, IonSegmentButton, IonLabel, IonItem, IonSelect, IonSelectOption,
-  IonCard, IonCardContent, IonButton, IonFab, IonFabButton
+<script setup lang="ts">
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonSegment,
+  IonSegmentButton,
+  IonLabel,
+  IonCard,
+  IonCardContent,
+  IonButton,
+  IonFab,
+  IonFabButton,
 } from '@ionic/vue';
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useRoute } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
+import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
-import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
+import { useCollections } from '@/stores/useCollections';
+import { useGpsUiStore } from '@/stores/useGpsUi';
 import { useLocation } from '@/stores/useLocation';
-import { useCompass } from '@/composables/useCompass';
-import { useTarget } from '@/composables/useTarget';
-import { useBearingDistance } from '@/composables/useBearingDistance';
-import { useWaypointActions } from '@/composables/useWaypointActions';
-import { ensureLocationGranted } from '@/composables/usePermissions';
-import { useFollowTrail } from '@/composables/useFollowTrail';
 import { usePrefsStore } from '@/stores/usePrefs';
 import { useActions } from '@/composables/useActions';
+import { useCompass } from '@/composables/useCompass';
+import { useBearingDistance } from '@/composables/useBearingDistance';
+import { useTarget } from '@/composables/useTarget';
+import { useWaypointActions } from '@/composables/useWaypointActions';
+import { useFollowTrail } from '@/composables/useFollowTrail';
+import { ensureLocationGranted } from '@/composables/usePermissions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
-import { Heading } from '@/plugins/heading';
+import GpsScopePanel from '@/components/gps/GpsScopePanel.vue';
 import { toLatLng } from '@/types';
 
-/** Page scope selection: operate on a waypoint or a trail. */
-type Scope = 'waypoint' | 'trail';
 const trails = useTrails();
-const wps = useWaypoints();
-/** Shortcut to all waypoints managed by the Waypoints store. */
-const waypointsAll = computed(() => wps.all);
+const waypointsStore = useWaypoints();
+const collections = useCollections();
+const gpsUi = useGpsUiStore();
+const prefs = usePrefsStore();
+const actions = useActions();
+const route = useRoute();
 
-/** Trail selection when in trail scope. */
-const selectedTrailId = ref<number | null>(null);
+const { scope, selectedWaypointId, selectedTrailId, selectedCollectionId } = storeToRefs(gpsUi);
 
-// Target selection (waypoint vs trail)
-const waypointsNamed = computed(() => (wps.all as any[]).map((w) => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon })));
-const trailWaypoints = computed(() => (selectedTrailId.value ? (wps.byTrail[selectedTrailId.value] ?? []) : []).map(w => ({ id: w.id as number, name: w.name, lat: w.lat, lon: w.lon })));
-const target = useTarget({ waypoints: waypointsNamed, trailWaypoints });
-const scope = target.scope;
-const selectedWaypointId = target.selectedWaypointId;
-const targetCoord = target.targetCoord;
+gpsUi.hydrateFromRoute(route);
+
+const waypointsAll = computed(() => waypointsStore.all);
+const waypointOptions = computed(() => waypointsAll.value.map((w) => ({ id: Number(w.id), name: w.name })));
+const waypointItems = computed(() => waypointsAll.value.map((w) => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon })));
+
+const trailOptions = computed(() => trails.list.map(t => ({ id: Number(t.id), name: t.name })));
+const trailWaypoints = computed(() => {
+  const id = selectedTrailId.value;
+  if (!id) return [] as { id: number; name: string; lat: number; lon: number }[];
+  const cached = waypointsStore.byTrail[id] ?? [];
+  return cached.map(w => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon }));
+});
+
+const collectionsList = computed(() => collections.list);
+const collectionOptions = computed(() => collectionsList.value.map(c => ({ id: Number(c.id), name: c.name })));
+const collectionWaypoints = computed(() => {
+  const id = selectedCollectionId.value;
+  if (id == null) return [] as { id: number; name: string; lat: number; lon: number }[];
+  const contents = collections.contents[id];
+  if (!contents) return [];
+  return contents.waypoints.map(w => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon }));
+});
 
 const loc = useLocation();
-/** Latest location sample exposed in a convenient shape for the UI. */
 const gps = computed(() => loc.current ? {
   lat: loc.current.lat,
   lon: loc.current.lon,
@@ -153,82 +172,63 @@ const gps = computed(() => loc.current ? {
   altitude: loc.current.altitude ?? null,
   heading: loc.current.heading ?? null,
   speed: loc.current.speed ?? null,
-  ts: (loc.current as any).timestamp ?? null
+  ts: (loc.current as any).timestamp ?? null,
 } : null);
 
 const gpsLatLng = computed(() => (gps.value ? toLatLng(gps.value.lat, gps.value.lon) : null));
 
-/** Current trail’s waypoints in a minimal form for Follow‑Trail logic. */
 const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
   useFollowTrail(trailWaypoints, gpsLatLng);
 
-const prefs = usePrefsStore();
-const actions = useActions();
+const { targetCoord, targetName } = useTarget({
+  scope,
+  providers: {
+    waypoint: { items: waypointItems, selectedId: selectedWaypointId },
+    trail: { items: trailWaypoints, currentIndex },
+    collection: { items: collectionWaypoints },
+  },
+});
+
+const trailFollowState = computed(() => ({
+  active: active.value,
+  current: active.value && next.value ? currentIndex.value + 1 : '-',
+  nextName: next.value?.name ?? targetName.value,
+}));
+
+const { userBearingText, distanceM } = useBearingDistance({
+  gps: gpsLatLng,
+  target: targetCoord,
+  headingDeg: computed(() => compass.headingDeg.value ?? null),
+  units: computed(() => prefs.units),
+});
+
+const bearingDisplay = computed(() => userBearingText.value);
+const bearingLabel = computed(() => targetName.value ? `Bearing to ${targetName.value}` : 'Bearing');
+
+const distanceDisplay = computed(() => {
+  if (distanceM.value == null) return '—';
+  if (prefs.units === 'imperial') {
+    const feet = distanceM.value * 3.28084;
+    return feet >= 528 ? `${(feet / 5280).toFixed(2)} mi` : `${feet.toFixed(0)} ft`;
+  }
+  return distanceM.value >= 1000 ? `${(distanceM.value / 1000).toFixed(2)} km` : `${distanceM.value.toFixed(0)} m`;
+});
 
 const isWeb = Capacitor.getPlatform() === 'web';
-// Compass via composable (throttled to 1 Hz)
 const compass = useCompass({ throttleMs: 1000, initialMode: prefs.compassMode, autoStart: false });
 const compassModeLabel = compass.modeLabel;
 const compassHeadingText = compass.headingText;
 
-// Derived UI values via composables
-const { trueNorthBearingDeg, userBearingText, distanceM } = useBearingDistance({
-  gps: gpsLatLng,
-  target: targetCoord,
-  headingDeg: compass.headingDeg,
-  units: computed(() => prefs.units)
-});
-const bearingDisplay = computed(() => userBearingText.value);
-/** Human‑readable target name for bearing label. */
-const bearingTargetName = computed(() =>
-{
-  if (scope.value === 'waypoint')
-  {
-    const t = waypointsAll.value.find(w => w.id === selectedWaypointId.value);
-    return t?.name ?? null;
-  }
-  if (scope.value === 'trail')
-  {
-    return next.value?.name ?? null;
-  }
-  return null;
-});
-const bearingLabel = computed(() => bearingTargetName.value ? `Bearing to ${ bearingTargetName.value }` : 'Bearing');
-// Distance formatting inline (feet/miles thresholds: 5280 ft = 1 mi)
-/** UI display string for distance using selected units. */
-const distanceDisplay = computed(() =>
-{
-  if (distanceM.value == null) return '—';
-  if (prefs.units === 'imperial')
-  {
-    const feet = distanceM.value * 3.28084; // meters → feet
-    return feet >= 528 ? `${ (feet / 5280).toFixed(2) } mi` : `${ feet.toFixed(0) } ft`;
-  }
-  return distanceM.value >= 1000 ? `${ (distanceM.value / 1000).toFixed(2) } km` : `${ distanceM.value.toFixed(0) } m`;
-});
-
-/** Start/stop Follow‑Trail for the selected trail. */
-async function toggleFollow ()
-{
+async function toggleFollow() {
   if (!selectedTrailId.value) return;
-  if (active.value)
-  {
-    stopFollow();
-  } else
-  {
-    startFollow(0);
-  }
+  if (active.value) stopFollow();
+  else startFollow(0);
 }
 
-/** One‑shot position to prime UI; does not manage stream lifecycle. */
-async function recenter ()
-{
-  // Snapshot current position to prime UI without waiting for next stream tick
+async function recenter() {
   const opts: PositionOptions = { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 };
-  try
-  {
+  try {
     const pos = await Geolocation.getCurrentPosition(opts);
-    // Seed store for immediate UI without waiting for next stream tick
     loc.current = {
       lat: pos.coords.latitude,
       lon: pos.coords.longitude,
@@ -238,119 +238,103 @@ async function recenter ()
       speed: pos.coords.speed ?? null,
       timestamp: (pos as any).timestamp ?? Date.now(),
       provider: 'geolocation',
-      raw: pos
+      raw: pos,
     } as any;
-  } catch (e)
-  {
+  } catch (e) {
     console.warn('[GpsPage] recenter failed', e);
   }
 }
 
-function clearWaypoint ()
-{
-  selectedWaypointId.value = null;
-}
-
-/** Create and select a new trail for recording waypoints. */
-async function recordNewTrail ()
-{
+async function recordNewTrail() {
   const ts = new Date();
-  const name = `Trail ${ ts.toLocaleDateString() } ${ ts.toLocaleTimeString() }`;
+  const name = `Trail ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`;
   const id = await trails.create({ name, description: null });
   selectedTrailId.value = id;
   actions.show('New trail ready. Tap + to record waypoints.', { kind: 'success' });
 }
 
-/** Toggle true vs magnetic north without restarting the compass stream. */
-async function toggleCompassMode ()
-{
-  const next = await compass.toggleMode();
-  await prefs.setCompassMode(next);
+async function toggleCompassMode() {
+  const nextMode = await compass.toggleMode();
+  await prefs.setCompassMode(nextMode);
 }
 
-
-/** Record a waypoint at the current GPS fix; attach when in trail scope. */
-async function markWaypoint ()
-{
-  if (!gps.value)
-  {
+async function markWaypoint() {
+  if (!gps.value) {
     actions.show('No GPS fix yet. Tap Recenter and allow location access.', {
-      kind: 'warning', placement: 'banner-top', durationMs: 2500
+      kind: 'warning',
+      placement: 'banner-top',
+      durationMs: 2500,
     });
     return;
   }
-  const point = { name: `WP ${ new Date().toLocaleTimeString() }`, lat: gps.value.lat, lon: gps.value.lon, elev_m: null };
-  try
-  {
+  const point = {
+    name: `WP ${new Date().toLocaleTimeString()}`,
+    lat: gps.value.lat,
+    lon: gps.value.lon,
+    elev_m: null,
+  };
+  try {
     const wpa = useWaypointActions();
-    if (scope.value === 'trail' && selectedTrailId.value) { await wpa.addToTrail(selectedTrailId.value, point); }
-    else { await wpa.createStandalone(point); }
-  } catch (err: any)
-  {
+    if (scope.value === 'trail' && selectedTrailId.value) {
+      await wpa.addToTrail(selectedTrailId.value, point);
+    } else {
+      await wpa.createStandalone(point);
+    }
+  } catch (err: any) {
     console.error('Mark waypoint failed', err);
-    actions.show(`Failed to save waypoint: ${ err?.message ?? String(err) }`, { kind: 'error', placement: 'banner-top', durationMs: null });
+    actions.show(`Failed to save waypoint: ${err?.message ?? String(err)}`, {
+      kind: 'error',
+      placement: 'banner-top',
+      durationMs: null,
+    });
   }
 }
 
-
-
-// Lifecycle — mount: start streams and seed fast snapshot
-onMounted(async () =>
-{
-  await Promise.all([trails.refresh(), wps.refreshAll()]);
-  // Start the unified location store
-  try
-  {
+onMounted(async () => {
+  await Promise.all([trails.refresh(), waypointsStore.refreshAll(), collections.refresh()]);
+  try {
     const ok = await ensureLocationGranted();
-    if (ok) { await loc.start(); await recenter(); }
-    else { actions.show('Location permission denied. Enable it in Settings to use GPS features.', { kind: 'error', placement: 'banner-top', durationMs: null, dismissLabel: 'Dismiss' }); }
-  } catch (e)
-  {
+    if (ok) {
+      await loc.start();
+      await recenter();
+    } else {
+      actions.show('Location permission denied. Enable it in Settings to use GPS features.', {
+        kind: 'error',
+        placement: 'banner-top',
+        durationMs: null,
+        dismissLabel: 'Dismiss',
+      });
+    }
+  } catch (e) {
     console.warn('[GpsPage] start stream failed', e);
   }
 
-  // prefs store is hydrated on app startup; values are reactive
-  if (!isWeb)
-  {
-    try
-    {
-      console.info('[Heading] init: platform', Capacitor.getPlatform());
-      console.info('[Heading] has start:', typeof (Heading as any)?.start);
+  if (!isWeb) {
+    try {
       await compass.start();
-    } catch (e)
-    {
+    } catch (e) {
       console.error('[Heading] init error', e);
     }
   }
 });
 
-// Lifecycle — unmount: detach page‑level subscriptions only
-onBeforeUnmount(() =>
-{
+onBeforeUnmount(() => {
   try { void compass.stop(); } catch { }
   try { loc.detach(); } catch { }
-  // Do not stop the global stream here; other tabs may use it concurrently.
 });
 
-// compassMode persists via prefs store actions
-watch(
-  () => prefs.compassMode,
-  (mode) => { void compass.setMode(mode); }
-);
-
-/** Watch selected trail and load its waypoints when it changes. */
-watch(selectedTrailId, async (id) => { if (id != null) await wps.loadForTrail(id); });
-
-// Feed location to native Heading plugin for true north declination
-/** Provide latest position to the compass plugin for declination (true north). */
-watch(() => gps.value, async (pos) =>
-{
+watch(() => prefs.compassMode, (mode) => { void compass.setMode(mode); });
+watch(selectedTrailId, async (id) => { if (id != null) await waypointsStore.loadForTrail(id); }, { immediate: true });
+watch(selectedCollectionId, async (id) => {
+  if (id == null) return;
+  if (!collections.contents[id]) await collections.loadContents(id);
+}, { immediate: true });
+watch(() => gps.value, async (pos) => {
   if (!pos || isWeb) return;
   await compass.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
 });
-
-// no gpsSub; store handles subscription lifecycle
 </script>
+
 <style scoped>
 .telemetry {
   display: grid;
@@ -375,8 +359,6 @@ watch(() => gps.value, async (pos) =>
   gap: 12px;
   margin-top: 8px;
 }
-
-
 
 .sr-only {
   position: absolute;

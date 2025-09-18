@@ -1,9 +1,10 @@
-import { ref, computed, type Ref } from 'vue';
+import { computed, type Ref } from 'vue';
+import type { GpsUiScope } from '@/stores/useGpsUi';
 import { isLatLng, toLatLng, type LatLng } from '@/types';
 
 type CoordInput = LatLng | { lat: number; lon: number };
 type NamedCoord = CoordInput & { id: number; name: string };
-export type Scope = 'waypoint' | 'trail';
+type Scope = GpsUiScope;
 
 /**
  * Manage target selection between a single waypoint and the next waypoint in a trail.
@@ -14,43 +15,89 @@ function toSafeLatLng(coord: CoordInput): LatLng
   return isLatLng(coord) ? coord : toLatLng(coord.lat, coord.lon);
 }
 
-export function useTarget (args: {
-  waypoints: Ref<NamedCoord[]>;
-  trailWaypoints: Ref<NamedCoord[]>;
-  initialScope?: Scope;
+type TargetProviders = {
+  waypoint: {
+    items: Ref<NamedCoord[]>;
+    selectedId: Ref<number | null>;
+  };
+  trail: {
+    items: Ref<NamedCoord[]>;
+    currentIndex?: Ref<number | null | undefined>;
+  };
+  collection: {
+    items: Ref<NamedCoord[]>;
+    currentIndex?: Ref<number | null | undefined>;
+  };
+};
+
+export function useTarget(args: {
+  scope: Ref<Scope>;
+  providers: TargetProviders;
 })
 {
-  const scope = ref<Scope>(args.initialScope ?? 'waypoint');
-  const selectedWaypointId = ref<number | null>(null);
-  const selectedTrailId = ref<number | null>(null);
+  const pickByIndex = (list: NamedCoord[], idx: number | null | undefined) =>
+  {
+    const safeIndex = typeof idx === 'number' && idx >= 0 ? idx : 0;
+    return list[safeIndex] ?? null;
+  };
 
   const targetCoord = computed<LatLng | null>(() =>
   {
-    if (scope.value === 'waypoint')
+    switch (args.scope.value)
     {
-      const t = args.waypoints.value.find(w => w.id === selectedWaypointId.value);
-      return t ? toSafeLatLng(t) : null;
+      case 'waypoint':
+      {
+        const { items, selectedId } = args.providers.waypoint;
+        const t = items.value.find(w => w.id === selectedId.value);
+        return t ? toSafeLatLng(t) : null;
+      }
+      case 'trail':
+      {
+        const { items, currentIndex } = args.providers.trail;
+        const t = pickByIndex(items.value, currentIndex?.value ?? 0);
+        return t ? toSafeLatLng(t) : null;
+      }
+      case 'collection':
+      {
+        const { items, currentIndex } = args.providers.collection;
+        const t = pickByIndex(items.value, currentIndex?.value ?? 0);
+        return t ? toSafeLatLng(t) : null;
+      }
+      default:
+        return null;
     }
-    const t = args.trailWaypoints.value[0] ?? null; // caller may override with follow‑trail index
-    return t ? toSafeLatLng(t) : null;
   });
 
   const targetName = computed<string | null>(() =>
   {
-    if (scope.value === 'waypoint')
+    switch (args.scope.value)
     {
-      const t = args.waypoints.value.find(w => w.id === selectedWaypointId.value);
-      return t?.name ?? null;
+      case 'waypoint':
+      {
+        const { items, selectedId } = args.providers.waypoint;
+        const t = items.value.find(w => w.id === selectedId.value);
+        return t?.name ?? null;
+      }
+      case 'trail':
+      {
+        const { items, currentIndex } = args.providers.trail;
+        const t = pickByIndex(items.value, currentIndex?.value ?? 0);
+        return t?.name ?? null;
+      }
+      case 'collection':
+      {
+        const { items, currentIndex } = args.providers.collection;
+        const t = pickByIndex(items.value, currentIndex?.value ?? 0);
+        return t?.name ?? null;
+      }
+      default:
+        return null;
     }
-    return args.trailWaypoints.value[0]?.name ?? null;
   });
 
-  function clear (): void { selectedWaypointId.value = null; }
+  function clear(): void { args.providers.waypoint.selectedId.value = null; }
 
   return {
-    scope,
-    selectedWaypointId,
-    selectedTrailId,
     targetCoord,
     targetName,
     clear

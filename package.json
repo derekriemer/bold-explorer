@@ -71,7 +71,11 @@
       "sql.js": "1.11.0"
     },
     "onlyBuiltDependencies": [
-      "better-sqlite3"
+      "better-sqlite3",
+      "core-js",
+      "cypress",
+      "esbuild",
+      "vue-demi"
     ]
   },
   "description": "Offline-first waypoint/trail app using Ionic Vue, Pinia, and SQLite (Capacitor) via Kysely."

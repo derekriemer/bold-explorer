@@ -30,6 +30,10 @@ Guidance for contributors/agents:
 
 ## Phase 2: Composables (no native deps)
 
+- [x] `tests/unit/composables/useBearingDistance.spec.ts`
+  - [x] defaults to relative degrees when heading available
+  - [x] switches format across clock/relative/true north modes
+  - [x] returns placeholder when prerequisites missing
 - [ ] `tests/unit/composables/useFollowTrail.spec.ts`
   - [ ] start/stop: active flag, announcement content
   - [ ] advance when within threshold; no advance when beyond

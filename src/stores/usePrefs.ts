@@ -9,6 +9,9 @@ type Units = (typeof UNITS_VALUES)[number];
 const COMPASS_VALUES = ['magnetic', 'true'] as const;
 type CompassMode = (typeof COMPASS_VALUES)[number];
 
+const BEARING_DISPLAY_VALUES = ['relative', 'clock', 'true'] as const;
+export type BearingDisplayMode = (typeof BEARING_DISPLAY_VALUES)[number];
+
 
 interface Versioned<T> { v: number; value: T; }
 
@@ -156,6 +159,16 @@ const CompassPref: PrefSpec<CompassMode> = {
   },
 };
 
+const BearingDisplayPref: PrefSpec<BearingDisplayMode> = {
+  key: 'bearing_display_mode',
+  currentVersion: 1,
+  default: 'relative',
+  validate: isLiteral(BEARING_DISPLAY_VALUES),
+  migrations: {
+    0: (old: unknown) => (typeof old === 'string' && isLiteral(BEARING_DISPLAY_VALUES)(old) ? old : 'relative'),
+  },
+};
+
 const AudioCuesPref: PrefSpec<boolean> = {
   key: 'audio_cues',
   currentVersion: 1,
@@ -171,6 +184,7 @@ interface PrefsState
 {
   units: Units;
   compassMode: CompassMode;
+  bearingDisplayMode: BearingDisplayMode;
   audioCuesEnabled: boolean;
   _hydrated: boolean;
 }
@@ -179,6 +193,7 @@ export const usePrefsStore = defineStore('prefs', {
   state: (): PrefsState => ({
     units: UnitsPref.default,
     compassMode: CompassPref.default,
+    bearingDisplayMode: BearingDisplayPref.default,
     audioCuesEnabled: AudioCuesPref.default,
     _hydrated: false,
   }),
@@ -190,15 +205,18 @@ export const usePrefsStore = defineStore('prefs', {
       const [
         loadedUnits,
         loadedCompassMode,
+        loadedBearingMode,
         loadedAudioCues,
       ] = await Promise.all([
         getOrInitWithMigrate(UnitsPref),
         getOrInitWithMigrate(CompassPref),
+        getOrInitWithMigrate(BearingDisplayPref),
         getOrInitWithMigrate(AudioCuesPref),
       ]);
 
       this.units = loadedUnits;
       this.compassMode = loadedCompassMode;
+      this.bearingDisplayMode = loadedBearingMode;
       this.audioCuesEnabled = loadedAudioCues;
       this._hydrated = true;
     },
@@ -213,6 +231,12 @@ export const usePrefsStore = defineStore('prefs', {
     {
       this.compassMode = value;
       await setPref(CompassPref, value);
+    },
+
+    async setBearingDisplayMode (value: BearingDisplayMode)
+    {
+      this.bearingDisplayMode = value;
+      await setPref(BearingDisplayPref, value);
     },
 
     async setAudioCuesEnabled (value: boolean)

@@ -200,6 +200,7 @@ const { userBearingText, distanceM } = useBearingDistance({
   target: targetCoord,
   headingDeg: computed(() => compass.headingDeg.value ?? null),
   units: computed(() => prefs.units),
+  bearingDisplayMode: computed(() => prefs.bearingDisplayMode),
 });
 
 const bearingDisplay = computed(() => userBearingText.value);

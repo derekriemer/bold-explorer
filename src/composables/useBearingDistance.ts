@@ -2,6 +2,7 @@ import { computed, type Ref } from 'vue';
 import { initialBearingDeg, haversineDistanceMeters } from '@/utils/geo';
 import { formatDistance, type Units } from './useDistance';
 import type { LatLng } from '@/types';
+import type { BearingDisplayMode } from '@/stores/usePrefs';
 
 /** Map an absolute bearing (0..360) to a cardinal text. */
 function toCardinal (deg: number): string
@@ -31,7 +32,7 @@ function deltaAngle (fromDeg: number, toDeg: number): number
  * Compute bearings and distance between current GPS and a target.
  * - trueNorthBearingDeg: absolute bearing (0..360) from GPS to target.
  * - relativeBearingDeg: signed angle (−180..180) between user headingDeg and bearing to target.
- * - userBearingText: cardinal text for trueNorthBearingDeg.
+ * - userBearingText: formatted bearing respecting user preference (relative/clock/true north).
  * - clockBearingText: clock position from relativeBearingDeg.
  * - distanceM/distanceText: meters and formatted string based on units.
  */
@@ -40,6 +41,7 @@ export function useBearingDistance (args: {
   target: Ref<LatLng | null>;
   headingDeg?: Ref<number | null>;
   units: Ref<Units>;
+  bearingDisplayMode?: Ref<BearingDisplayMode>;
 })
 {
   const trueNorthBearingDeg = computed<number | null>(() =>
@@ -56,8 +58,22 @@ export function useBearingDistance (args: {
 
   const userBearingText = computed<string>(() =>
   {
-    const b = trueNorthBearingDeg.value;
-    return b == null ? '—' : `${ toCardinal(b) } ${ b.toFixed(0) }°`;
+    const mode: BearingDisplayMode = args.bearingDisplayMode?.value ?? 'relative';
+
+    if (mode === 'clock')
+    {
+      const r = relativeBearingDeg.value;
+      return r == null ? '—' : toClock(r);
+    }
+
+    if (mode === 'true')
+    {
+      const t = trueNorthBearingDeg.value;
+      return t == null ? '—' : `${ toCardinal(t) } ${ t.toFixed(0) }° true`;
+    }
+
+    const r = relativeBearingDeg.value;
+    return r == null ? '—' : `${ toCardinal(r) } ${ r.toFixed(0) }°`;
   });
 
   const clockBearingText = computed<string>(() =>

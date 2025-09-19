@@ -47,21 +47,26 @@ describe('usePrefsStore', () => {
 
     expect(store.units).toBe('imperial');
     expect(store.compassMode).toBe('magnetic');
+    expect(store.bearingDisplayMode).toBe('relative');
     expect(store.audioCuesEnabled).toBe(true);
 
     const unitsRaw = raw('units');
     const compassRaw = raw('compass_mode');
+    const bearingRaw = raw('bearing_display_mode');
     const audioRaw = raw('audio_cues');
     expect(unitsRaw).toBeTruthy();
     expect(compassRaw).toBeTruthy();
+    expect(bearingRaw).toBeTruthy();
     expect(audioRaw).toBeTruthy();
 
     const unitsObj = JSON.parse(unitsRaw!);
     const compassObj = JSON.parse(compassRaw!);
+    const bearingObj = JSON.parse(bearingRaw!);
     const audioObj = JSON.parse(audioRaw!);
 
     expect(unitsObj).toEqual({ v: 1, value: 'imperial' });
     expect(compassObj).toEqual({ v: 1, value: 'magnetic' });
+    expect(bearingObj).toEqual({ v: 1, value: 'relative' });
     expect(audioObj).toEqual({ v: 1, value: true });
   });
 
@@ -69,6 +74,7 @@ describe('usePrefsStore', () => {
     // Pre-populate legacy plain strings
     kv['units'] = 'metric'; // valid legacy
     kv['compass_mode'] = 'true'; // valid legacy
+    kv['bearing_display_mode'] = 'clock'; // valid legacy
     kv['audio_cues'] = 'false'; // valid legacy (string)
 
     const store = usePrefsStore();
@@ -76,13 +82,16 @@ describe('usePrefsStore', () => {
 
     expect(store.units).toBe('metric');
     expect(store.compassMode).toBe('true');
+    expect(store.bearingDisplayMode).toBe('clock');
     expect(store.audioCuesEnabled).toBe(false);
 
     const unitsObj = JSON.parse(raw('units')!);
     const compassObj = JSON.parse(raw('compass_mode')!);
+    const bearingObj = JSON.parse(raw('bearing_display_mode')!);
     const audioObj = JSON.parse(raw('audio_cues')!);
     expect(unitsObj.v).toBe(1);
     expect(compassObj.v).toBe(1);
+    expect(bearingObj.v).toBe(1);
     expect(audioObj.v).toBe(1);
   });
 
@@ -90,6 +99,7 @@ describe('usePrefsStore', () => {
     // Invalid entries
     kv['units'] = 'foo';
     kv['compass_mode'] = 'nope';
+    kv['bearing_display_mode'] = '??';
     kv['audio_cues'] = 'maybe';
 
     const store = usePrefsStore();
@@ -97,6 +107,7 @@ describe('usePrefsStore', () => {
 
     expect(store.units).toBe('imperial');
     expect(store.compassMode).toBe('magnetic');
+    expect(store.bearingDisplayMode).toBe('relative');
     expect(store.audioCuesEnabled).toBe(true);
   });
 
@@ -112,6 +123,10 @@ describe('usePrefsStore', () => {
     expect(store.compassMode).toBe('true');
     expect(JSON.parse(raw('compass_mode')!)).toEqual({ v: 1, value: 'true' });
 
+    await store.setBearingDisplayMode('clock');
+    expect(store.bearingDisplayMode).toBe('clock');
+    expect(JSON.parse(raw('bearing_display_mode')!)).toEqual({ v: 1, value: 'clock' });
+
     await store.setAudioCuesEnabled(false);
     expect(store.audioCuesEnabled).toBe(false);
     expect(JSON.parse(raw('audio_cues')!)).toEqual({ v: 1, value: false });
@@ -121,9 +136,12 @@ describe('usePrefsStore', () => {
     const store = usePrefsStore();
     await store.hydrate();
     await store.setUnits('metric');
+    await store.setBearingDisplayMode('clock');
     // Place conflicting raw to ensure hydrate() early exits when already hydrated
     kv['units'] = 'imperial';
+    kv['bearing_display_mode'] = 'true';
     await store.hydrate();
     expect(store.units).toBe('metric');
+    expect(store.bearingDisplayMode).toBe('clock');
   });
 });

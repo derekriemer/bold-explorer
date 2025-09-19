@@ -128,7 +128,7 @@ export interface TrailWaypoint {
   id: number;
   trail_id: number;
   waypoint_id: number;
-  position: number;        // 1‑based within trail
+  position: number; // 1‑based within trail
   created_at: string;
 }
 
@@ -136,8 +136,8 @@ export interface AutoWaypoint {
   id: number;
   trail_id: number;
   name: string | null;
-  segment_index: number;   // 1..N-1 between ordered waypoints
-  offset_m: number;        // meters from start of segment
+  segment_index: number; // 1..N-1 between ordered waypoints
+  offset_m: number; // meters from start of segment
   lat: number | null;
   lon: number | null;
   created_at: string;
@@ -202,7 +202,7 @@ export async function installRepositories(pinia: Pinia) {
     trails: new TrailsRepo(db),
     waypoints: new WaypointsRepo(db),
     collections: new CollectionsRepo(db),
-    autoWaypoints: new AutoWaypointsRepo(db)
+    autoWaypoints: new AutoWaypointsRepo(db),
   });
   pinia.use(() => ({ $repos: repos }));
 }
@@ -254,7 +254,7 @@ If future requirements need auto waypoints to follow specific waypoint pairs acr
 
 ## Distance and Bearing (portable algorithms)
 
-High‑level approach (portable across platforms, no SQL trigonometry required):
+High‑level approach (portable across platforms, Do not use trigonometry in SQL since sqllite does not support it).
 
 - Compute a geographic bounding box around a center using meters→degrees and `cos(latitude)` for longitude span.
 - Use the bbox to prefilter candidates via index (`idx_waypoint_lat_lon` on `(lat, lon)`).
@@ -277,9 +277,17 @@ Helpers in `src/utils/geo.ts` implement these steps:
 GPX Service — `gpx.service.ts`
 
 ```ts
-export function exportTrailToGpx(trailId: number, opts?: { includeAuto?: boolean }): Promise<FileInfo>
-export function exportCollectionToGpx(collectionId: number, opts?: { includeAuto?: boolean }): Promise<FileInfo>
-export function importGpx(fileUri: string): Promise<{ createdWaypoints: number[]; createdTrails: number[] }>
+export function exportTrailToGpx(
+  trailId: number,
+  opts?: { includeAuto?: boolean }
+): Promise<FileInfo>;
+export function exportCollectionToGpx(
+  collectionId: number,
+  opts?: { includeAuto?: boolean }
+): Promise<FileInfo>;
+export function importGpx(
+  fileUri: string
+): Promise<{ createdWaypoints: number[]; createdTrails: number[] }>;
 ```
 
 ## Ionic UI & Navigation
@@ -310,7 +318,16 @@ Compass Usage:
 - Uses a Capacitor Heading plugin (`plugins/heading`) to stream heading readings and apply declination via `setLocation`.
 - Preference `compassMode` (`'magnetic' | 'true'`) controls whether the UI shows Magnetic North or True North.
 - The header text toggles the mode (compact control); values persist via `usePrefsStore`.
-- Bearing to target is computed in JS (`initialBearingDeg`) from current GPS position and target coordinate.
+- Bearing-to-target is purely geometric: `initialBearingDeg` works off GPS fixes (lat/lon) and the selected waypoint/trail waypoint. It never depends on compass readings, ensuring the target arrow remains stable even when the magnetometer drifts or the user is stationary.
+- Compass alignment is independent: magnetometer output (with declination when true north is enabled) powers the live heading UI and the “Align to Bearing” cues. When the user defines a custom bearing, we align the compass-zero via rotation but do not alter the GPS-derived bearing-to-target pipeline.
+- “Align to Bearing” mode layers on top of the compass HUD:
+  - Tap the compass row to open an `IonModal` titled “Align to Bearing”. On open the modal seeds the target bearing with the current heading and enables alignment guidance.
+  - Modal controls: primary display of the target bearing, `+1°` / `-1°` buttons (press-and-hold after 500 ms accelerates to 5° steps), and a “Reset to current” action that re-reads the latest compass value. No free-form text entry required for screen readers, but include an editable numeric field so users can dictate or type an exact degree value.
+  - Store shape: extend `useGpsUiStore` with `alignmentActive: boolean`, `alignmentBearingDeg: number | null`, and `alignmentLastBearingDeg: number | null`. Opening the modal sets both `alignmentActive` and `alignmentBearingDeg`; dismissing the modal clears `alignmentActive` and `alignmentBearingDeg` (no residual rotation), but preserves `alignmentLastBearingDeg` so reopening shows the most recent value.
+  - Sensor pipeline: expose `alignmentBearing$` as an observable driving `rotateZeroToBearing`. A new composable (`useBearingAlignment`) returns the rotated heading (−180…+180 relative) plus helpers like `differenceAbs`, `differenceSign`, and a `pan` value (left = −1, right = +1).
+  - Feedback cadence: issue a very short audio ping (≤100 ms) at 1 Hz while alignment is active. Allow fallback to ~0.33 Hz (every 3 s) via a future preference if power usage demands it, but default to 1 Hz for now. Haptics mirror the cue: vibrate twice for the target on left or thrice for right target on side depending on `differenceSign`, with intensity scaled by `differenceAbs` and silence once the user is within ±3° of target.
+  - Audio rendering: use Web Audio panning to place the ping toward the side that needs correction. Adjust tone/pitch so “right of target” plays a slightly higher note than “left of target”. When the user is centered (deadband), swap to a calming confirmation tone every 3 s.
+  - Accessibility: announce adjustments after each button press (e.g., “Bearing set to 085 degrees, 5 degrees right of target”). The modal is dismissible with Escape/screen-reader gestures. When dismissed, announce “Alignment guidance off.” Outside the modal, show a subtle badge on the compass row when `alignmentLastBearingDeg` exists (“Last bearing 085°”) so users can remember what they were following without reactivating guidance.
 
 ### 2) Waypoints Page (`WaypointsPage.vue`)
 
@@ -430,4 +447,3 @@ Misc: if targeting web, configure the SQLite plugin’s web/WASM adapter.
 ## Limitations
 
 - Background location on web is limited; native bridges may be required for robust background tracking.
-

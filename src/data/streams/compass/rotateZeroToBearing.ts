@@ -1,4 +1,4 @@
-import { isObservable, map, Observable, of, OperatorFunction, startWith, withLatestFrom } from 'rxjs';
+import { from, isObservable, map, Observable, of, OperatorFunction, startWith, withLatestFrom } from 'rxjs';
 import type { ObservableInput } from 'rxjs';
 import type { HeadingReading } from '@/plugins/heading';
 
@@ -68,15 +68,23 @@ function toBearingObservable (bearing: number | ObservableInput<number | null | 
 {
   if (isObservable(bearing))
   {
-    return bearing.pipe(
-      map((value) => (value == null ? null : normalizeHeading(value))),
-      startWith(null)
+    return (bearing as Observable<number | null | undefined>).pipe(
+      map<number | null | undefined, number | null>((value) => (value == null ? null : normalizeHeading(value))),
+      startWith<number | null>(null)
     );
   }
 
-  return of(bearing).pipe(
-    map((value) => (value == null ? null : normalizeHeading(value))),
-    startWith(null)
+  if (typeof bearing === 'number' || bearing == null)
+  {
+    return of<number | null>(bearing ?? null).pipe(
+      map<number | null, number | null>((value) => (value == null ? null : normalizeHeading(value))),
+      startWith<number | null>(null)
+    );
+  }
+
+  return from(bearing).pipe(
+    map<number | null | undefined, number | null>((value) => (value == null ? null : normalizeHeading(value))),
+    startWith<number | null>(null)
   );
 }
 

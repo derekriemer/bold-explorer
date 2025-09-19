@@ -1,7 +1,7 @@
 import { computed, type Ref } from 'vue';
 import { initialBearingDeg, haversineDistanceMeters } from '@/utils/geo';
 import { formatDistance, type Units } from './useDistance';
-import type { LatLng } from '@/types';
+import { toLatLng, type LatLng, type LocationSample } from '@/types';
 import type { BearingDisplayMode } from '@/stores/usePrefs';
 
 /** Map an absolute bearing (0..360) to a cardinal text. */
@@ -31,29 +31,41 @@ function deltaAngle (fromDeg: number, toDeg: number): number
 /**
  * Compute bearings and distance between current GPS and a target.
  * - trueNorthBearingDeg: absolute bearing (0..360) from GPS to target.
- * - relativeBearingDeg: signed angle (−180..180) between user headingDeg and bearing to target.
+ * - relativeBearingDeg: signed angle (−180..180) between GPS heading and bearing to target.
  * - userBearingText: formatted bearing respecting user preference (relative/clock/true north).
  * - clockBearingText: clock position from relativeBearingDeg.
  * - distanceM/distanceText: meters and formatted string based on units.
  */
 export function useBearingDistance (args: {
-  gps: Ref<LatLng | null>;
+  gps: Ref<Pick<LocationSample, 'lat' | 'lon' | 'heading'> | null>;
   target: Ref<LatLng | null>;
-  headingDeg?: Ref<number | null>;
   units: Ref<Units>;
   bearingDisplayMode?: Ref<BearingDisplayMode>;
 })
 {
+  const gpsLatLng = computed<LatLng | null>(() =>
+  {
+    const sample = args.gps.value;
+    if (!sample) return null;
+    return toLatLng(sample.lat, sample.lon);
+  });
+
+  const gpsHeadingDeg = computed<number | null>(() =>
+  {
+    const heading = args.gps.value?.heading;
+    return typeof heading === 'number' ? heading : null;
+  });
+
   const trueNorthBearingDeg = computed<number | null>(() =>
   {
-    if (!args.gps.value || !args.target.value) return null;
-    return initialBearingDeg(args.gps.value, args.target.value);
+    if (!gpsLatLng.value || !args.target.value) return null;
+    return initialBearingDeg(gpsLatLng.value, args.target.value);
   });
 
   const relativeBearingDeg = computed<number | null>(() =>
   {
-    if (!args.headingDeg || args.headingDeg.value == null || trueNorthBearingDeg.value == null) return null;
-    return deltaAngle(args.headingDeg.value, trueNorthBearingDeg.value);
+    if (gpsHeadingDeg.value == null || trueNorthBearingDeg.value == null) return null;
+    return deltaAngle(gpsHeadingDeg.value, trueNorthBearingDeg.value);
   });
 
   const userBearingText = computed<string>(() =>
@@ -84,7 +96,7 @@ export function useBearingDistance (args: {
 
   const distanceM = computed<number | null>(() =>
   {
-    const a = args.gps.value; const b = args.target.value;
+    const a = gpsLatLng.value; const b = args.target.value;
     return a && b ? haversineDistanceMeters(a, b) : null;
   });
 

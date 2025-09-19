@@ -1,20 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ref, type Ref } from 'vue';
 import { useBearingDistance } from '@/composables/useBearingDistance';
-import type { LatLng } from '@/types';
+import type { LatLng, LocationSample } from '@/types';
 import type { Units } from '@/composables/useDistance';
 
 describe('useBearingDistance', () => {
-  let gps: Ref<LatLng | null>;
+  let gps: Ref<Pick<LocationSample, 'lat' | 'lon' | 'heading'> | null>;
   let target: Ref<LatLng | null>;
-  let headingDeg: Ref<number | null>;
   let units: Ref<Units>;
   let mode: Ref<'relative' | 'clock' | 'true'>;
 
   beforeEach(() => {
-    gps = ref<LatLng | null>({ lat: 0, lon: 0 });
+    gps = ref({ lat: 0, lon: 0, heading: 0 });
     target = ref<LatLng | null>({ lat: 0, lon: 1 });
-    headingDeg = ref<number | null>(0);
     units = ref<Units>('metric');
     mode = ref<'relative' | 'clock' | 'true'>('relative');
   });
@@ -23,7 +21,6 @@ describe('useBearingDistance', () => {
     const { userBearingText } = useBearingDistance({
       gps,
       target,
-      headingDeg,
       units,
       bearingDisplayMode: mode,
     });
@@ -35,7 +32,6 @@ describe('useBearingDistance', () => {
     const { userBearingText } = useBearingDistance({
       gps,
       target,
-      headingDeg,
       units,
       bearingDisplayMode: mode,
     });
@@ -51,12 +47,11 @@ describe('useBearingDistance', () => {
     const { userBearingText } = useBearingDistance({
       gps,
       target,
-      headingDeg,
       units,
       bearingDisplayMode: mode,
     });
 
-    headingDeg.value = null;
+    gps.value = gps.value ? { ...gps.value, heading: null } : null;
     expect(userBearingText.value).toBe('—');
 
     mode.value = 'true';

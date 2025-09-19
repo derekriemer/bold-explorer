@@ -196,9 +196,8 @@ const trailFollowState = computed(() => ({
 }));
 
 const { userBearingText, distanceM } = useBearingDistance({
-  gps: gpsLatLng,
+  gps,
   target: targetCoord,
-  headingDeg: computed(() => compass.headingDeg.value ?? null),
   units: computed(() => prefs.units),
   bearingDisplayMode: computed(() => prefs.bearingDisplayMode),
 });

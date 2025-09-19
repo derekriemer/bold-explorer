@@ -21,11 +21,37 @@ function toClock (rel: number): string
   return `${ label } o'clock`;
 }
 
-/** Signed smallest angular difference a→b in range [−180, 180). */
-function deltaAngle (fromDeg: number, toDeg: number): number
+function normalize360 (deg: number): number
 {
-  const d = ((toDeg - fromDeg + 540) % 360) - 180;
+  return ((deg % 360) + 360) % 360;
+}
+
+/**
+ * Signed smallest angular difference between the device heading and target bearing.
+ *
+ * @param fromHeadingDeg Heading the user/device is currently facing (0° = north).
+ * @param toBearingDeg Absolute bearing from the user toward the target (0° = north).
+ * @returns Delta in range [−180, 180). Negative values mean the target lies to the left.
+ */
+function deltaAngle (fromHeadingDeg: number, toBearingDeg: number): number
+{
+  const d = ((toBearingDeg - fromHeadingDeg + 540) % 360) - 180;
   return d;
+}
+
+function formatRelativeBearing (deg: number): string
+{
+  if (!Number.isFinite(deg)) return '—';
+
+  const rounded = Number(deg.toFixed(0));
+  if (rounded === 0) return '0° ahead';
+
+  const direction = rounded > 0 ? 'right' : 'left';
+  if (Math.abs(rounded) > 120)
+  {
+    return `${ Math.abs(rounded) }° ${ direction } behind you`;
+  }
+  return `${ Math.abs(rounded) }° ${ direction }`;
 }
 
 /**
@@ -81,11 +107,13 @@ export function useBearingDistance (args: {
     if (mode === 'true')
     {
       const t = trueNorthBearingDeg.value;
-      return t == null ? '—' : `${ toCardinal(t) } ${ t.toFixed(0) }° true`;
+      if (t == null) return '—';
+      const normalized = normalize360(t);
+      return `${ toCardinal(normalized) } ${ normalized.toFixed(0) }° true`;
     }
 
     const r = relativeBearingDeg.value;
-    return r == null ? '—' : `${ toCardinal(r) } ${ r.toFixed(0) }°`;
+    return r == null ? '—' : formatRelativeBearing(r);
   });
 
   const clockBearingText = computed<string>(() =>

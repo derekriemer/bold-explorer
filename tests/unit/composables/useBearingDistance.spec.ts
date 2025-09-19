@@ -25,7 +25,20 @@ describe('useBearingDistance', () => {
       bearingDisplayMode: mode,
     });
 
-    expect(userBearingText.value).toBe('E 90°');
+    expect(userBearingText.value).toBe('90° right');
+  });
+
+  it('describes bearings behind the user when the delta is large', () => {
+    target.value = { lat: -1, lon: 0 } as unknown as LatLng;
+
+    const { userBearingText } = useBearingDistance({
+      gps,
+      target,
+      units,
+      bearingDisplayMode: mode,
+    });
+
+    expect(userBearingText.value).toBe('behind you (180° left)');
   });
 
   it('switches formats based on bearing display mode', () => {

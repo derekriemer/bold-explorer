@@ -28,7 +28,7 @@ class LocationStream
     /** Provider + configs */
     private provider: LocationProvider;
     private providerOpts: Required<ProviderOptions> = {
-        timeoutMs: 15000,
+        timeoutMs: 30000,
         maximumAgeMs: 0
     };
 

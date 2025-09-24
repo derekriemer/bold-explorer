@@ -28,6 +28,9 @@
                   <ion-segment-button value="replay">
                     <ion-label>Replay</ion-label>
                   </ion-segment-button>
+                  <ion-segment-button value="background">
+                    <ion-label>Background</ion-label>
+                  </ion-segment-button>
                 </ion-segment>
               </ion-item>
               <ion-item>

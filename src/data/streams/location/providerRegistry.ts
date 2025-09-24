@@ -1,5 +1,5 @@
 import type { LocationProvider, ProviderKind } from '@/types';
-import { GeolocationProvider, FakeableProvider, ReplayProvider, type ReplayPoint } from './providers';
+import { GeolocationProvider, FakeableProvider, ReplayProvider, BackgroundGeolocationProvider, type ReplayPoint } from './providers';
 import { BehaviorSubject } from 'rxjs';
 
 type ProviderState = { kind: ProviderKind; provider: LocationProvider };
@@ -70,7 +70,7 @@ class ProviderRegistry
       case 'geolocation': this.instances[kind] = new GeolocationProvider(); break;
       case 'mock': this.instances[kind] = new FakeableProvider(); break;
       case 'replay': this.instances[kind] = new ReplayProvider(this.replayPoints); break;
-      case 'background': this.instances[kind] = new GeolocationProvider(); break; // placeholder
+      case 'background': this.instances[kind] = new BackgroundGeolocationProvider(); break;
     }
     return this.instances[kind]!;
   }

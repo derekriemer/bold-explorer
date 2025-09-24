@@ -12,6 +12,9 @@ importers:
 
   .:
     dependencies:
+      '@capacitor-community/background-geolocation':
+        specifier: ^1.2.26
+        version: 1.2.26(@capacitor/core@7.4.3)
       '@capacitor-community/sqlite':
         specifier: ^7.0.1
         version: 7.0.1(@capacitor/core@7.4.3)
@@ -36,6 +39,9 @@ importers:
       '@capacitor/keyboard':
         specifier: 7.0.2
         version: 7.0.2(@capacitor/core@7.4.3)
+      '@capacitor/local-notifications':
+        specifier: ^7.0.3
+        version: 7.0.3(@capacitor/core@7.4.3)
       '@capacitor/motion':
         specifier: ^7.0.1
         version: 7.0.1(@capacitor/core@7.4.3)
@@ -637,6 +643,11 @@ packages:
     resolution: {integrity: sha512-ruv7Ae4J5dUYULmeXw1gmb7rYRz57OWCPM57pHojnLq/3Z1CK2lNSLTCVjxVk1F/TZHwOZZrOWi0ur95BbLxNQ==}
     engines: {node: '>=6.9.0'}
 
+  '@capacitor-community/background-geolocation@1.2.26':
+    resolution: {integrity: sha512-kuva8VQ6zM+uIKgHUJTP87IYbmGKhX7DZw62JYfGZ888h4Xr5zeN+UTR6KBRHQVrGBpzSfbv+6/HQVuHYa7W5A==}
+    peerDependencies:
+      '@capacitor/core': '>=3.0.0'
+
   '@capacitor-community/sqlite@7.0.1':
     resolution: {integrity: sha512-Ypl8rTzgugBiPlqkeHM3mtt30py3AM5Ax4zZML+5XZjrNYUXHuiKUFgvSNW4a8glzP3/bjpYGiYkMHfclV1pTQ==}
     engines: {node: '>=16.0.0'}
@@ -678,6 +689,11 @@ packages:
 
   '@capacitor/keyboard@7.0.2':
     resolution: {integrity: sha512-9We5BY1mu+QWOReDukr+6HxA4Bh0mKBU0txFtwXJdjBohttMYWJzB+dQf4oHrX8odiU2Cm/BfDdAU2wV06Cyig==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/local-notifications@7.0.3':
+    resolution: {integrity: sha512-zVHZk5AYRiBwBDynaD7caPUROozgvwOG0L2SPFw1HBTWCscJvo0fsaE67NWW252jzel3PH0XogglJUYFx/jtHA==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
@@ -4203,6 +4219,10 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
 
+  '@capacitor-community/background-geolocation@1.2.26(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
+
   '@capacitor-community/sqlite@7.0.1(@capacitor/core@7.4.3)':
     dependencies:
       '@capacitor/core': 7.4.3
@@ -4257,6 +4277,10 @@ snapshots:
       '@capacitor/core': 7.4.3
 
   '@capacitor/keyboard@7.0.2(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
+
+  '@capacitor/local-notifications@7.0.3(@capacitor/core@7.4.3)':
     dependencies:
       '@capacitor/core': 7.4.3
 

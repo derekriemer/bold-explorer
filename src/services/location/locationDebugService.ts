@@ -14,6 +14,7 @@ class LocationDebugService
   private audioContext: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private liveRegion: HTMLDivElement | null = null;
+  private unlockTeardown: Array<() => void> | null = null;
 
   start (): void
   {
@@ -71,6 +72,68 @@ class LocationDebugService
 
     this.audioContext = ctx;
     this.masterGain = gain;
+    if (ctx.state !== 'running')
+    {
+      this.installUnlockHandlers();
+    }
+  }
+
+  private installUnlockHandlers (): void
+  {
+    if (typeof window === 'undefined') return;
+    if (this.unlockTeardown) return;
+
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'touchstart', 'keydown'];
+    const disposers: Array<() => void> = [];
+    const attemptResume = () => { void this.resumeAudioContext(); };
+
+    for (const eventName of events)
+    {
+      const handler = () => { attemptResume(); };
+      window.addEventListener(eventName, handler, { once: true, passive: true });
+      disposers.push(() => { window.removeEventListener(eventName, handler); });
+    }
+
+    this.unlockTeardown = disposers;
+  }
+
+  private clearUnlockHandlers (): void
+  {
+    if (!this.unlockTeardown) return;
+    for (const dispose of this.unlockTeardown)
+    {
+      try { dispose(); } catch { /* noop */ }
+    }
+    this.unlockTeardown = null;
+  }
+
+  private async resumeAudioContext (): Promise<void>
+  {
+    const ctx = this.audioContext;
+    if (!ctx) return;
+
+    const initialState = ctx.state;
+    if (initialState === 'running')
+    {
+      this.clearUnlockHandlers();
+      return;
+    }
+
+    try
+    {
+      await ctx.resume();
+      const resumedState = ctx.state;
+      if (resumedState === 'running')
+      {
+        this.clearUnlockHandlers();
+      } else
+      {
+        this.installUnlockHandlers();
+      }
+    } catch
+    {
+      this.installUnlockHandlers();
+    }
   }
 
   private ensureLiveRegion (): void
@@ -111,9 +174,10 @@ class LocationDebugService
     const now = ctx.currentTime;
     const duration = DEFAULT_DURATION_SEC;
 
-    if (ctx.state === 'suspended')
+    if (ctx.state !== 'running')
     {
-      void ctx.resume().catch(() => { /* ignore */ });
+      void this.resumeAudioContext();
+      return;
     }
 
     const osc = ctx.createOscillator();

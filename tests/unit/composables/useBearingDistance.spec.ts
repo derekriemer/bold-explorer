@@ -38,7 +38,7 @@ describe('useBearingDistance', () => {
       bearingDisplayMode: mode,
     });
 
-    expect(userBearingText.value).toBe('behind you (180° left)');
+    expect(userBearingText.value).toBe('180° left behind you');
   });
 
   it('switches formats based on bearing display mode', () => {

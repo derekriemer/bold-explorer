@@ -47,6 +47,8 @@ See STYLE_GUIDE.md for project‑wide style and page organization guidance (impo
 
 - Let the user review the changes you did before committing, ask if the user wants to commit these changes instead of just going out and committing.
 - Do _not_ `git addd --all` or `git add -a`, instead, prefer figuring out which files changed and adding the files that are specific to a feature. This is much safer than adding potentially unrelated changes.
+- Before offering a commit, call out any untracked or unrelated modified files and propose how to group them into focused commits rather than bundling everything together.
+- Feel free to suggest multiple commits when it makes sense; draft a commit message for each proposed commit (motivation, changes, verification) and share them for review before staging anything.
 
 ### Commit message formatting (preferred)
 

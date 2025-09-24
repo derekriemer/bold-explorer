@@ -21,6 +21,8 @@ Guidance for contributors/agents:
   - [x] parseCenterParam: valid "lat,lon" parsing
   - [x] parseCenterParam: array input picks first
   - [x] parseCenterParam: rejects invalid formats and ranges
+- [x] `tests/unit/gpsUi.store.spec.ts`
+  - [x] alignment lifecycle: begin/set/end/reset and history fallback
 - [x] `tests/unit/services/actions.service.spec.ts`
   - [x] show: defaults, durable vs timed (durationMs null)
   - [x] dismiss: removes and calls onDismiss

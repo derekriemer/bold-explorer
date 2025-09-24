@@ -282,7 +282,7 @@ async function restartWatch ()
 
 async function stopWatch ()
 {
-  try { sub?.unsubscribe(); } catch {}
+  try { sub?.unsubscribe(); } catch { }
   sub = null;
   await locationStream.stop();
   watching.value = false;
@@ -417,7 +417,7 @@ onBeforeUnmount(() =>
 {
   try { removeHeadingListener?.(); } catch (e) { console.warn('[DebugPage] removeHeadingListener failed', e); }
   removeHeadingListener = null;
-  try { sub?.unsubscribe(); } catch {}
+  try { sub?.unsubscribe(); } catch { }
   sub = null;
 });
 

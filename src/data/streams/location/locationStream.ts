@@ -34,7 +34,7 @@ class LocationStream
 
     /** Consumer-facing watch filters */
     private opts: Required<WatchOptions> = {
-        minAccuracyM: 30,
+        minAccuracyM: 15,
         minIntervalMs: 1000,
         distanceMinM: 0
     };

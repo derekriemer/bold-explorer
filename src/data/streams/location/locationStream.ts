@@ -4,7 +4,7 @@
 // - Interval throttle
 // - Distance gate
 // Providers only emit raw samples; LocationStream applies all gating.
-// Default provider = Capacitor Geolocation with enableHighAccuracy=true.
+// Default provider = Capacitor Geolocation.
 
 import { BehaviorSubject, Observable } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -12,9 +12,7 @@ import { filter } from 'rxjs/operators';
 import { haversineDistanceMeters } from '@/utils/geo';
 import { toLatLng } from '@/types';
 import type { LocationSample, WatchOptions, ProviderOptions, LocationProvider, ProviderKind } from '@/types';
-import { GeolocationProvider } from './providers';
 import { providerRegistry } from './providerRegistry';
-
 
 // ---------------- The stream singleton ------------------------------
 
@@ -43,21 +41,39 @@ class LocationStream
     private lastEmitted: LocationSample | null = null;
     private lastEmitTime = 0;
 
+    /** Track requested watch state */
+    private shouldBeWatching = false;
+    private starting = false;
+
     constructor(provider?: LocationProvider)
     {
         const active = provider ?? providerRegistry.getActiveProvider();
         this.provider = active;
         // React to registry changes by swapping provider and preserving watch state
-        providerRegistry.active$.subscribe(({ provider: p }) => { this.swapProvider(p); });
+        providerRegistry.active$.subscribe(({ provider: p }) => { void this.swapProvider(p); });
     }
 
     /** Swap in a new provider (e.g., BackgroundProvider, MockProvider). */
-    swapProvider (next: LocationProvider)
+    private async swapProvider (next: LocationProvider): Promise<void>
     {
-        const wasActive = this.isWatching();
-        if (wasActive) void this.stop();
+        const resume = this.shouldBeWatching;
+        const prev = this.provider;
+
+        if (resume && prev && prev.isActive())
+        {
+            try { await prev.stop(); }
+            catch (err)
+            {
+                console.warn('[locationStream] failed to stop previous provider', err);
+            }
+        }
+
         this.provider = next;
-        if (wasActive) void this.start(); // resume with same configs
+
+        if (resume)
+        {
+            void this.start();
+        }
     }
 
     /** Configure provider-level behavior (timeouts, cache). */
@@ -78,23 +94,54 @@ class LocationStream
     /** Start watching; providers emit raw samples, we apply gates. */
     async start ()
     {
-        if (this.isWatching()) return;
+        if (this.isWatching() || this.starting)
+        {
+            this.shouldBeWatching = true;
+            return;
+        }
+
+        this.shouldBeWatching = true;
 
         // Reset gates
         this.lastEmitted = null;
         this.lastEmitTime = 0;
 
-        await this.provider.start(
-            this.providerOpts,
-            (s) => this.emitIfPasses(s),
-            (_e) => { /* optionally surface an error subject */ }
-        );
+        this.starting = true;
+        try
+        {
+            await this.provider.start(
+                this.providerOpts,
+                (s) => this.emitIfPasses(s),
+                (e) => { this.handleProviderError(e); }
+            );
+        }
+        catch (err)
+        {
+            this.handleProviderError(err);
+        }
+        finally
+        {
+            this.starting = false;
+        }
+
+        if (!this.provider.isActive() && this.shouldBeWatching)
+        {
+            this.scheduleBackgroundFallback('inactive-after-start');
+        }
     }
 
     async stop ()
     {
-        if (!this.isWatching()) return;
-        await this.provider.stop();
+        if (!this.shouldBeWatching && !this.isWatching()) return;
+        this.shouldBeWatching = false;
+        try
+        {
+            await this.provider.stop();
+        }
+        catch (err)
+        {
+            console.warn('[locationStream] failed to stop provider', err);
+        }
     }
 
     // ---------------- Gating logic ----------------
@@ -121,6 +168,41 @@ class LocationStream
         this.lastEmitted = s;
         this.lastEmitTime = now;
         this.subject.next(s);
+    }
+
+    private handleProviderError (err: unknown)
+    {
+        if (!this.shouldBeWatching)
+        {
+            console.warn('[locationStream] provider error after stop request', err);
+            return;
+        }
+
+        this.scheduleBackgroundFallback(err);
+    }
+
+    private scheduleBackgroundFallback (reason: unknown)
+    {
+        if (!this.shouldBeWatching) return;
+        if (providerRegistry.getActiveKind() !== 'background')
+        {
+            if (reason !== 'inactive-after-start')
+            {
+                console.warn('[locationStream] provider error', reason);
+            }
+            return;
+        }
+
+        console.warn('[locationStream] background provider unavailable, falling back to geolocation', reason);
+        providerRegistry.switchTo('geolocation');
+
+        queueMicrotask(() =>
+        {
+            if (!this.shouldBeWatching) return;
+            if (providerRegistry.getActiveKind() !== 'geolocation') return;
+            if (this.isWatching() || this.starting) return;
+            void this.start();
+        });
     }
 }
 

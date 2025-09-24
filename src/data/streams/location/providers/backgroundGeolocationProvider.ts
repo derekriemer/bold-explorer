@@ -28,6 +28,22 @@ function toSample(location: BackgroundLocation): LocationSample {
   };
 }
 
+function createError(message: string, code: string, cause?: unknown): Error & { code: string }
+{
+  const err = new Error(message) as Error & { code: string };
+  err.code = code;
+  if (cause !== undefined) err.cause = cause;
+  return err;
+}
+
+function isBackgroundPluginAvailable(): boolean
+{
+  if (!Capacitor.isNativePlatform()) return false;
+  if (!Capacitor.isPluginAvailable('BackgroundGeolocation')) return false;
+  if (Capacitor.getPlatform() === 'android' && !Capacitor.isPluginAvailable('LocalNotifications')) return false;
+  return true;
+}
+
 async function ensureAndroidNotificationPermission(): Promise<boolean> {
   if (Capacitor.getPlatform() !== 'android') return true;
   if (!Capacitor.isPluginAvailable('LocalNotifications')) return false;
@@ -45,6 +61,11 @@ async function ensureAndroidNotificationPermission(): Promise<boolean> {
 export class BackgroundGeolocationProvider implements LocationProvider {
   private watchId: string | null = null;
 
+  static isSupported (): boolean
+  {
+    return isBackgroundPluginAvailable();
+  }
+
   isActive(): boolean {
     return this.watchId !== null;
   }
@@ -56,19 +77,14 @@ export class BackgroundGeolocationProvider implements LocationProvider {
   ): Promise<void> {
     if (this.watchId) return;
 
-    if (!Capacitor.isNativePlatform()) {
-      onError(new Error('Background geolocation is only available on native platforms.'));
-      return;
-    }
-
-    if (!Capacitor.isPluginAvailable('BackgroundGeolocation')) {
-      onError(new Error('Background geolocation plugin unavailable.'));
+    if (!BackgroundGeolocationProvider.isSupported()) {
+      onError(createError('Background geolocation plugin unavailable.', 'UNAVAILABLE'));
       return;
     }
 
     const notificationsOkay = await ensureAndroidNotificationPermission();
     if (!notificationsOkay) {
-      onError(new Error('Background tracking requires notification permission.'));
+      onError(createError('Background tracking requires notification permission.', 'PERMISSION_DENIED'));
       return;
     }
 
@@ -97,7 +113,7 @@ export class BackgroundGeolocationProvider implements LocationProvider {
 
   private handleWatcherError(error: BackgroundError, onError: (e: unknown) => void): void {
     if (error?.code === 'NOT_AUTHORIZED') {
-      onError(new Error('Background location permission denied. Enable permissions in Settings to continue.'));
+      onError(createError('Background location permission denied. Enable permissions in Settings to continue.', 'PERMISSION_DENIED', error));
       return;
     }
     onError(error);

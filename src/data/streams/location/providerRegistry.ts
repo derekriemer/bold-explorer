@@ -13,8 +13,9 @@ class ProviderRegistry
 
   constructor()
   {
-    const initialProvider = this.instantiate('geolocation');
-    this.state$ = new BehaviorSubject<ProviderState>({ kind: 'geolocation', provider: initialProvider });
+    const initialKind = this.resolvePreferredKind();
+    const initialProvider = this.instantiate(initialKind);
+    this.state$ = new BehaviorSubject<ProviderState>({ kind: initialKind, provider: initialProvider });
   }
 
   /** Observable stream of the active provider state. */
@@ -49,16 +50,18 @@ class ProviderRegistry
   /** Get or construct a provider instance for a kind (does not switch active). */
   get (kind: ProviderKind): LocationProvider
   {
-    return this.instantiate(kind);
+    const resolved = this.resolvePreferredKind(kind);
+    return this.instantiate(resolved);
   }
 
   /** Switch the active provider kind and emit via Rx. */
   switchTo (kind: ProviderKind): LocationProvider
   {
+    const resolved = this.resolvePreferredKind(kind);
     const cur = this.state$.getValue();
-    if (cur.kind === kind) return cur.provider;
-    const p = this.instantiate(kind);
-    this.state$.next({ kind, provider: p });
+    if (cur.kind === resolved) return cur.provider;
+    const p = this.instantiate(resolved);
+    this.state$.next({ kind: resolved, provider: p });
     return p;
   }
 
@@ -73,6 +76,22 @@ class ProviderRegistry
       case 'background': this.instances[kind] = new BackgroundGeolocationProvider(); break;
     }
     return this.instances[kind]!;
+  }
+
+  private resolvePreferredKind (requested?: ProviderKind): ProviderKind
+  {
+    if (!requested)
+    {
+      if (BackgroundGeolocationProvider.isSupported()) return 'background';
+      return 'geolocation';
+    }
+
+    if (requested === 'background' && !BackgroundGeolocationProvider.isSupported())
+    {
+      return 'geolocation';
+    }
+
+    return requested;
   }
 }
 

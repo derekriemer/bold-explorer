@@ -40,8 +40,9 @@
     <!-- Location (foreground) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Optional: allow background updates if you later add background tracking -->
-    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Notification (Android 13+) for persistent background tracking notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Networking (required by Capacitor/WebView) -->
     <uses-permission android:name="android.permission.INTERNET" />

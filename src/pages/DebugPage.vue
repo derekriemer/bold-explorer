@@ -365,7 +365,12 @@ async function restartWatch ()
   const cfg = getApplied();
   // Configure provider + stream filters
   locationStream.configureProvider({ maximumAgeMs: cfg.options.maximumAge, timeoutMs: cfg.options.timeout });
-  locationStream.configureWatch({ minAccuracyM: cfg.minAccuracyM, minIntervalMs: 1000, distanceMinM: 0 });
+  locationStream.configureWatch({
+    minAccuracyM: cfg.minAccuracyM,
+    minIntervalMs: 1000,
+    distanceMinM: 0,
+    settleMs: cfg.settleMs
+  });
   const ok = await ensurePermissions();
   if (ok)
   {

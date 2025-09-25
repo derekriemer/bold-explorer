@@ -23,18 +23,10 @@ export class GeolocationProvider implements LocationProvider
         }
     }
 
-    async getCurrent (opts: Partial<ProviderOptions>): Promise<LocationSample | null>
+    async getCurrent (opts: Partial<ProviderOptions>): Promise<LocationSample>
     {
-        try
-        {
-            const position = await Geolocation.getCurrentPosition(toPositionOptions(opts));
-            return positionToSample(position);
-        }
-        catch (err)
-        {
-            console.warn('[GeolocationProvider] getCurrent failed', err);
-            return null;
-        }
+        const position = await Geolocation.getCurrentPosition(toPositionOptions(opts));
+        return positionToSample(position);
     }
 
     async start (

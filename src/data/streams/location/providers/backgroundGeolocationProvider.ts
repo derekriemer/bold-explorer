@@ -106,11 +106,17 @@ export class BackgroundGeolocationProvider implements LocationProvider
     }
   }
 
-  async getCurrent (opts: Partial<ProviderOptions>): Promise<LocationSample | null>
+  async getCurrent (opts: Partial<ProviderOptions>): Promise<LocationSample>
   {
-    if (!BackgroundGeolocationProvider.isSupported()) return null;
+    if (!BackgroundGeolocationProvider.isSupported())
+    {
+      throw createError('Background geolocation plugin unavailable.', 'UNAVAILABLE');
+    }
     const ok = await this.ensurePermissions();
-    if (!ok) return null;
+    if (!ok)
+    {
+      throw createError('Background tracking requires additional permissions.', 'PERMISSION_DENIED');
+    }
 
     const timeout = Math.max(2000, opts.timeoutMs ?? 5000);
     const watcherOptions: WatcherOptions = {
@@ -121,7 +127,7 @@ export class BackgroundGeolocationProvider implements LocationProvider
       distanceFilter: 0
     };
 
-    return new Promise((resolve) =>
+    return new Promise<LocationSample>((resolve, reject) =>
     {
       let resolved = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
@@ -146,7 +152,7 @@ export class BackgroundGeolocationProvider implements LocationProvider
         {
           resolved = true;
           await cleanup();
-          resolve(null);
+          reject(error);
           return;
         }
         if (location)
@@ -164,13 +170,15 @@ export class BackgroundGeolocationProvider implements LocationProvider
           if (resolved) return;
           resolved = true;
           await cleanup();
-          resolve(null);
+          reject(createError('Timed out acquiring background location fix.', 'TIMEOUT'));
         }, timeout);
       }).catch(async (err) =>
       {
+        if (resolved) return;
+        resolved = true;
         console.warn('[BackgroundGeolocation] getCurrent watcher failed', err);
         await cleanup();
-        resolve(null);
+        reject(err);
       });
     });
   }

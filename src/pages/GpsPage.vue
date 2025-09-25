@@ -38,9 +38,9 @@
           <ion-card-content>
             <div class="telemetry">
               <div v-if="!isWeb" class="telemetry-item telemetry-item--compass" role="region"
-                :aria-labelledby="compassRegionLabelId">
+                :aria-labelledby=" compassRegionLabelId ">
                 <div class="label">
-                  <span :id="compassRegionLabelId" class="telemetry-label">Compass</span>
+                  <span :id=" compassRegionLabelId " class="telemetry-label">Compass</span>
                   <ion-button fill="clear" size="small" class="compass-toggle" @click=" toggleCompassMode ">
                     {{ compassModeLabel }}
                   </ion-button>
@@ -171,6 +171,7 @@ import { useWaypointActions } from '@/composables/useWaypointActions';
 import { useFollowTrail } from '@/composables/useFollowTrail';
 import { useBearingAlignment } from '@/composables/useBearingAlignment';
 import { usePermissionAlert } from '@/composables/usePermissionAlert';
+import { ensureLocationGranted } from '@/composables/usePermissions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import GpsScopePanel from '@/components/gps/GpsScopePanel.vue';
@@ -200,15 +201,13 @@ const permissionAlertButtons = [
 
 async function ensureLocationPermission (): Promise<boolean>
 {
-  const ok = await locationStream.ensureProviderPermissions();
-  if (!ok)
-  {
-    permissionAlert.show({
+  return await ensureLocationGranted({
+    alert: permissionAlert,
+    message: {
       header: 'Location Permission Required',
       message: 'Enable location access in system settings to unlock GPS tracking and compass guidance.'
-    });
-  }
-  return ok;
+    }
+  });
 }
 
 type AlignmentInputElement = HTMLElement & { setFocus?: () => Promise<void> };
@@ -520,14 +519,6 @@ async function recenter ()
   try
   {
     const sample = await locationStream.getCurrentSnapshot({ timeoutMs: 5000 });
-    if (!sample)
-    {
-      permissionAlert.show({
-        header: 'Location Unavailable',
-        message: 'Unable to retrieve a GPS fix. Ensure location services are enabled and try again.'
-      });
-      return;
-    }
     loc.current = sample;
   } catch (e)
   {
@@ -538,6 +529,13 @@ async function recenter ()
         header: 'Location Permission Required',
         message: 'Location access appears to be disabled. Open settings to re-enable GPS tracking.'
       });
+    } else
+    {
+      permissionAlert.show({
+        header: 'Location Unavailable',
+        message: 'Unable to retrieve a GPS fix. Ensure location services are enabled and try again.'
+      });
+      return;
     }
   }
 }

@@ -36,12 +36,12 @@ export class ReplayProvider implements LocationProvider
     return true;
   }
 
-  async getCurrent (): Promise<LocationSample | null>
+  async getCurrent (_opts?: Partial<ProviderOptions>): Promise<LocationSample>
   {
     const p = this.points[this.idx] ?? this.points[0];
     if (!p)
     {
-      return null;
+      throw new Error('ReplayProvider has no points to replay');
     }
     const ts = p.timestamp ?? this.clock;
     return {

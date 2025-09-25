@@ -3,7 +3,7 @@ import { App } from '@capacitor/app';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 
-interface PermissionAlertOptions {
+export interface PermissionAlertOptions {
   header?: string;
   message: string;
 }

@@ -21,11 +21,11 @@ export class FakeableProvider implements LocationProvider
     return true;
   }
 
-  async getCurrent (): Promise<LocationSample | null>
+  async getCurrent (_opts?: Partial<ProviderOptions>): Promise<LocationSample>
   {
     if (!this.cur)
     {
-      return null;
+      throw new Error('FakeableProvider has no current location');
     }
     return {
       lat: this.cur.lat,

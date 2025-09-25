@@ -2,22 +2,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePermissionAlert } from '@/composables/usePermissionAlert';
 import { App } from '@capacitor/app';
 
-const openSettingsMock = vi.fn<[], Promise<void>>();
-const registerPluginMock = vi.fn(() => ({ openSettings: openSettingsMock }));
-const isNativePlatformMock = vi.fn(() => true);
-const isPluginAvailableMock = vi.fn(() => true);
+const mocks = vi.hoisted(() => {
+  const openSettingsMock = vi.fn<[], Promise<void>>();
+  const registerPluginMock = vi.fn(() => ({ openSettings: openSettingsMock }));
+  const isNativePlatformMock = vi.fn(() => true);
+  const isPluginAvailableMock = vi.fn(() => true);
+  return { openSettingsMock, registerPluginMock, isNativePlatformMock, isPluginAvailableMock };
+});
 
-vi.mock('@capacitor/app', () => ({
-  App: { openSettings: vi.fn(() => Promise.resolve()) }
-}));
+vi.mock('@capacitor/app', () => {
+  const { openSettingsMock } = mocks;
+  return {
+    App: { openSettings: vi.fn(() => Promise.resolve()) },
+    __openSettingsMock: openSettingsMock
+  } as any;
+});
 
-vi.mock('@capacitor/core', () => ({
-  Capacitor: {
-    isNativePlatform: isNativePlatformMock,
-    isPluginAvailable: isPluginAvailableMock
-  },
-  registerPlugin: registerPluginMock
-}));
+vi.mock('@capacitor/core', () => {
+  const { registerPluginMock, isNativePlatformMock, isPluginAvailableMock } = mocks;
+  return {
+    Capacitor: {
+      isNativePlatform: isNativePlatformMock,
+      isPluginAvailable: isPluginAvailableMock
+    },
+    registerPlugin: registerPluginMock
+  };
+});
+
+const { openSettingsMock, registerPluginMock, isNativePlatformMock, isPluginAvailableMock } = mocks;
 
 describe('usePermissionAlert', () =>
 {

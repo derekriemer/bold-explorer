@@ -65,12 +65,16 @@ class LocationStream
     private opts: Required<WatchOptions> = {
         minAccuracyM: 15,
         minIntervalMs: 1000,
-        distanceMinM: 0
+        distanceMinM: 0,
+        settleMs: 0
     };
 
     /** Gates bookkeeping */
     private lastEmitted: LocationSample | null = null;
     private lastEmitTime = 0;
+    private bestCandidate: LocationSample | null = null;
+    private settleTimer: ReturnType<typeof setTimeout> | null = null;
+    private settleDeadline: number | null = null;
 
     /** Track requested watch state */
     private shouldBeWatching = false;
@@ -151,34 +155,33 @@ class LocationStream
     /** Ensure the active provider has required permissions. */
     public async ensureProviderPermissions (): Promise<boolean>
     {
-        if (typeof this.provider.ensurePermissions === 'function')
+        try { return await this.provider.ensurePermissions(); }
+        catch (err)
         {
-            try { return await this.provider.ensurePermissions(); }
-            catch (err)
-            {
-                console.warn('[locationStream] ensureProviderPermissions failed', err);
-                return false;
-            }
+            console.warn('[locationStream] ensureProviderPermissions failed', err);
+            return false;
         }
         return true;
     }
 
     /** Fetch a snapshot from the provider or fall back to the last emitted sample. */
-    public async getCurrentSnapshot (partial?: Partial<ProviderOptions>): Promise<LocationSample | null>
+    public async getCurrentSnapshot (partial?: Partial<ProviderOptions>): Promise<LocationSample>
     {
-        if (typeof this.provider.getCurrent === 'function')
+        try
         {
-            try
-            {
-                const sample = await this.provider.getCurrent({ ...this.providerOpts, ...partial });
-                if (sample) return sample;
-            }
-            catch (err)
-            {
-                console.warn('[locationStream] getCurrentSnapshot provider fallback failed', err);
-            }
+            const sample = await this.provider.getCurrent({ ...this.providerOpts, ...partial });
+            if (sample) return sample;
         }
-        return this.subject.getValue();
+        catch (err)
+        {
+            console.warn('[locationStream] getCurrentSnapshot provider failed', err);
+            const fallback = this.subject.getValue();
+            if (fallback) return fallback;
+            throw err;
+        }
+        const fallback = this.subject.getValue();
+        if (fallback) return fallback;
+        throw new Error('Location snapshot unavailable');
     }
 
     /** Start watching; providers emit raw samples, we apply gates. */
@@ -199,19 +202,18 @@ class LocationStream
         this.starting = true;
         try
         {
-            if (typeof this.provider.ensurePermissions === 'function')
+            const ok = await this.provider.ensurePermissions();
+            if (!ok)
             {
-                const ok = await this.provider.ensurePermissions();
-                if (!ok)
-                {
-                    const err = new Error('Location provider permissions were not granted');
-                    (err as any).code = 'PERMISSION_DENIED';
-                    this.handleProviderError(err);
-                    this.shouldBeWatching = false;
-                    return;
-                }
+                const err = new Error('Location provider permissions were not granted');
+                (err as any).code = 'PERMISSION_DENIED';
+                this.handleProviderError(err);
+                this.shouldBeWatching = false;
+                this.clearSettlingState();
+                return;
             }
 
+            this.initSettlingState();
             await this.provider.start(
                 this.providerOpts,
                 (s) => this.emitIfPasses(s),
@@ -220,6 +222,7 @@ class LocationStream
         }
         catch (err)
         {
+            this.clearSettlingState();
             this.handleProviderError(err);
         }
         finally
@@ -245,12 +248,18 @@ class LocationStream
         {
             console.warn('[locationStream] failed to stop provider', err);
         }
+        finally
+        {
+            this.clearSettlingState();
+        }
     }
 
     // ---------------- Gating logic ----------------
 
     private emitIfPasses (s: LocationSample)
     {
+        this.updateBestCandidate(s);
+
         // Accuracy filter (relaxed when background provider is active)
         if (!isAccuracyAcceptable(s, this.opts.minAccuracyM)) return;
 
@@ -268,9 +277,8 @@ class LocationStream
             if (d < this.opts.distanceMinM) return;
         }
 
-        this.lastEmitted = s;
-        this.lastEmitTime = now;
-        this.subject.next(s);
+        this.emitSample(s);
+        this.clearSettlingState();
     }
 
     private handleProviderError (err: unknown)
@@ -306,6 +314,73 @@ class LocationStream
             if (this.isWatching() || this.starting) return;
             void this.start();
         });
+    }
+
+    private initSettlingState (): void
+    {
+        this.clearSettlingState();
+        const settleMs = Math.max(0, this.opts.settleMs ?? 0);
+        if (settleMs > 0)
+        {
+            this.settleDeadline = Date.now() + settleMs;
+            this.settleTimer = setTimeout(() =>
+            {
+                this.flushBestCandidate();
+            }, settleMs);
+        }
+    }
+
+    private clearSettlingState (): void
+    {
+        if (this.settleTimer)
+        {
+            clearTimeout(this.settleTimer);
+        }
+        this.settleTimer = null;
+        this.settleDeadline = null;
+        this.bestCandidate = null;
+    }
+
+    private updateBestCandidate (sample: LocationSample): void
+    {
+        if ((this.opts.settleMs ?? 0) <= 0) return;
+
+        if (!this.bestCandidate)
+        {
+            this.bestCandidate = sample;
+            return;
+        }
+
+        const candidateAcc = this.bestCandidate.accuracy;
+        const nextAcc = sample.accuracy;
+
+        if (typeof nextAcc === 'number' && !Number.isNaN(nextAcc))
+        {
+            if (candidateAcc == null || Number.isNaN(candidateAcc) || nextAcc < candidateAcc)
+            {
+                this.bestCandidate = sample;
+            }
+        }
+        else if (candidateAcc == null)
+        {
+            this.bestCandidate = sample;
+        }
+    }
+
+    private flushBestCandidate (): void
+    {
+        if (!this.bestCandidate) return;
+        const sample = this.bestCandidate;
+        this.clearSettlingState();
+        this.emitSample(sample);
+    }
+
+    private emitSample (sample: LocationSample): void
+    {
+        const now = Date.now();
+        this.lastEmitted = sample;
+        this.lastEmitTime = now;
+        this.subject.next(sample);
     }
 }
 

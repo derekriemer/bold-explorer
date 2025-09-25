@@ -25,11 +25,13 @@ export interface LocationProvider
     /** True if provider is actively producing samples. */
     isActive (): boolean;
 
-    /** Ensure the required permissions are granted (optional for providers that do not need any). */
-    ensurePermissions? (): Promise<boolean>;
+    /** Ensure the required permissions are granted (Implement a noop for providers that do not need any). */
+    ensurePermissions (): Promise<boolean>;
 
-    /** Fetch a one-off sample without maintaining a watch (optional). */
-    getCurrent? (opts: Partial<ProviderOptions>): Promise<LocationSample | null>;
+    /**
+     * Fetch a one-off sample without maintaining a watch. When the location updates fail, errors will reject from the promise. It's the caller's responsibility to gracefully handle these.
+    */
+    getCurrent (opts: Partial<ProviderOptions>): Promise<LocationSample>;
 }
 
 // todo (codex): Document me
@@ -52,6 +54,7 @@ export interface WatchOptions
     minAccuracyM?: number;  // drop samples worse than this
     minIntervalMs?: number; // throttle
     distanceMinM?: number;  // only emit if moved this far
+    settleMs?: number;      // wait this long for a precise fix before emitting best-so-far
 }
 
 /**

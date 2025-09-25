@@ -4,4 +4,8 @@
     <string name="title_activity_main">bold_explorer</string>
     <string name="package_name">com.derekriemer.boldexplorer</string>
     <string name="custom_url_scheme">com.derekriemer.boldexplorer</string>
+    <!-- Background geolocation notification resources -->
+    <string name="capacitor_background_geolocation_notification_channel_name">Background Tracking</string>
+    <string name="capacitor_background_geolocation_notification_icon">mipmap/ic_launcher</string>
+    <string name="capacitor_background_geolocation_notification_color">#FF5722</string>
 </resources>

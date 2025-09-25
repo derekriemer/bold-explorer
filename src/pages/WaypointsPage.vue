@@ -91,7 +91,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
-import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
 import { useLocation } from '@/stores/useLocation';
 import { useWaypointDistances } from '@/composables/useWaypointDistances';
 import { formatDistance as fmtDistance } from '@/composables/useDistance';
@@ -102,6 +101,7 @@ import { useActions } from '@/composables/useActions';
 import type { Waypoint } from '@/db/schema';
 import { actionsService } from '@/services/actions.service';
 import { toLatLng, tryParseLatLng, type LatLng } from '@/types';
+import { locationStream } from '@/data/streams/location';
 
 const wps = useWaypoints();
 const trails = useTrails();
@@ -346,32 +346,18 @@ onIonViewWillEnter(async () =>
 // --- Permissions and snapshot helpers ---
 async function ensurePermissions (): Promise<boolean>
 {
-  try
-  {
-    const status = await Geolocation.checkPermissions();
-    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
-    if (granted) return true;
-    const req = await Geolocation.requestPermissions();
-    return (req as any).location === 'granted' || (req as any).coarseLocation === 'granted' || (req as any).fineLocation === 'granted';
-  } catch { return true; }
+  return await locationStream.ensureProviderPermissions();
 }
 
 async function recenterFast ()
 {
   try
   {
-    const opts: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
-    const pos = await Geolocation.getCurrentPosition(opts);
-    // Seed the store's current value to improve initial responsiveness
-    loc.current = {
-      lat: pos.coords.latitude,
-      lon: pos.coords.longitude,
-      accuracy: pos.coords.accuracy ?? undefined,
-      altitude: pos.coords.altitude ?? null,
-      timestamp: (pos as any).timestamp ?? Date.now(),
-      provider: 'geolocation',
-      raw: pos
-    } as any;
+    const sample = await locationStream.getCurrentSnapshot({ timeoutMs: 5000 });
+    if (sample)
+    {
+      loc.current = sample;
+    }
   } catch (e)
   {
     console.warn('[Waypoints] recenter snapshot failed', e);

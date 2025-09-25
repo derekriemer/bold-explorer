@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "node scripts/copy-sqljs-wasm.cjs && vite",
     "build": "node scripts/copy-sqljs-wasm.cjs && vue-tsc && vite build",
+    "build:agent": "ROLLUP_NO_NATIVE=1 node scripts/copy-sqljs-wasm.cjs && vue-tsc && ROLLUP_NO_NATIVE=1 vite build",
     "preview": "vite preview",
     "test:e2e": "cypress run",
     "test:unit": "vitest run",
+    "test:agent:unit": "ROLLUP_NO_NATIVE=1 vitest run",
     "bench:db": "node scripts/bench-db.mjs",
     "bench:db:web": "node scripts/bench-db.mjs --mode web",
     "bench:db:native": "node scripts/bench-db.mjs --mode native",

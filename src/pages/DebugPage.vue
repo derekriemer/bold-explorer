@@ -78,7 +78,11 @@
               </div>
               <div class="telemetry-item">
                 <div class="label">Accuracy</div>
-                <div class="value">{{ gps?.accuracy != null ? `${ gps.accuracy.toFixed(0) } m (${ m2ft(gps?.accuracy)?.toFixed(0) } ft)` : '—' }}</div>
+                <div class="value">{{ curAccText }}</div>
+              </div>
+              <div class="telemetry-item">
+                <div class="label">Provider</div>
+                <div class="value">{{ providerDisplay }}</div>
               </div>
               <div class="telemetry-item" v-if="!isWeb">
                 <div class="label">Compass (Magnetic)</div>
@@ -93,6 +97,7 @@
                 <div class="value">{{ declinationText }}</div>
               </div>
             </div>
+            <p class="provider-status" v-if="providerStatusText">{{ providerStatusText }}</p>
             <div class="controls">
               <ion-button @click=" recenter ">Recenter/Calibrate</ion-button>
             </div>
@@ -135,6 +140,13 @@
         </ion-card>
       </div>
     </ion-content>
+    <ion-alert
+      :is-open=" permissionAlert.isOpen "
+      :header=" permissionAlert.header "
+      :message=" permissionAlert.message "
+      :buttons=" permissionAlertButtons "
+      @didDismiss=" permissionAlert.dismiss "
+    />
   </ion-page>
 
 </template>
@@ -143,38 +155,102 @@ import
 {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonBackButton, IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonList, IonItem, IonLabel, IonInput, IonToggle, IonSegment, IonSegmentButton
+  IonList, IonItem, IonLabel, IonInput, IonToggle, IonSegment, IonSegmentButton, IonAlert
 } from '@ionic/vue';
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Capacitor } from '@capacitor/core';
 import { useWaypoints } from '@/stores/useWaypoints';
-import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
-import { locationStream, providerRegistry } from '@/data/streams/location';
+import { locationStream, providerRegistry, type LocationStreamMetaEvent } from '@/data/streams/location';
 import { useActions } from '@/composables/useActions';
 import { Heading } from '@/plugins/heading';
+import type { ProviderKind } from '@/types';
+import { usePermissionAlert } from '@/composables/usePermissionAlert';
 
-type Fix = { lat: number; lon: number; accuracy?: number; altitude?: number | null; ts?: number };
+type Fix = {
+  lat: number;
+  lon: number;
+  accuracy?: number;
+  altitude?: number | null;
+  ts?: number;
+  provider?: ProviderKind | null;
+};
 const gps = ref<Fix | null>(null);
 const best = ref<Fix | null>(null);
 const watching = ref<boolean>(false);
 const actions = useActions();
 const wps = useWaypoints();
 const isWeb = Capacitor.getPlatform() === 'web';
+const permissionAlert = usePermissionAlert();
+const permissionAlertButtons = [
+  {
+    text: 'Not now',
+    role: 'cancel',
+    handler: () => { permissionAlert.dismiss(); }
+  },
+  {
+    text: 'Open Settings',
+    handler: () => permissionAlert.openSettings()
+  }
+] as const;
+
+const DEFAULTS = {
+  minAccuracyM: 10,
+  settleMs: 15000,
+  enableHighAccuracy: true,
+  maximumAge: 0,
+  timeout: 30000
+} as const;
+
+const PROVIDER_LABELS: Record<ProviderKind, string> = {
+  geolocation: 'Geolocation (GPS)',
+  mock: 'Mock (Dev)',
+  replay: 'Replay (Trail)',
+  background: 'Background (Native)'
+};
+
+const timeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit'
+});
+
+const formatProvider = (kind?: ProviderKind | null): string =>
+  kind ? (PROVIDER_LABELS[kind] ?? kind) : '';
+
+const formatTimestamp = (value: number): string => timeFormatter.format(new Date(value));
 
 async function recenter ()
 {
   try
   {
-    const opts: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
-    const pos = await Geolocation.getCurrentPosition(opts);
+    const sample = await locationStream.getCurrentSnapshot({ timeoutMs: 5000 });
+    if (!sample)
+    {
+      permissionAlert.show({
+        header: 'Location Unavailable',
+        message: 'Unable to retrieve a GPS fix. Ensure location access is enabled and try again.'
+      });
+      return;
+    }
     gps.value = {
-      lat: pos.coords.latitude,
-      lon: pos.coords.longitude,
-      accuracy: pos.coords.accuracy ?? undefined,
-      altitude: pos.coords.altitude ?? null,
-      ts: (pos as any).timestamp ?? Date.now()
+      lat: sample.lat,
+      lon: sample.lon,
+      accuracy: sample.accuracy,
+      altitude: sample.altitude ?? null,
+      ts: sample.timestamp,
+      provider: sample.provider
     };
-  } catch (e) { console.warn('[Debug] recenter failed', e); }
+  } catch (e)
+  {
+    console.warn('[Debug] recenter failed', e);
+    if ((e as any)?.code === 1)
+    {
+      permissionAlert.show({
+        header: 'Location Permission Required',
+        message: 'Location access appears to be disabled. Open settings to unlock live updates.'
+      });
+    }
+  }
 }
 
 // Compass plugin state
@@ -195,12 +271,12 @@ const declinationText = computed(() => declinationDeg.value != null ? `${ declin
 const diag = ref<{ repos?: boolean; queryOk?: boolean; createOk?: boolean; deleteOk?: boolean; count?: number; error?: string } | null>(null);
 
 // Tunable options state
-const minAccuracyM = ref<number>(10);
-const settleMs = ref<number>(15000);
-const optEnableHighAccuracy = ref<boolean>(true);
-const optMaximumAge = ref<number>(0);
-const optTimeout = ref<number>(45000);
-const providerKind = ref<'geolocation' | 'mock' | 'replay' | 'background'>(providerRegistry.getActiveKind());
+const minAccuracyM = ref<number>(DEFAULTS.minAccuracyM);
+const settleMs = ref<number>(DEFAULTS.settleMs);
+const optEnableHighAccuracy = ref<boolean>(DEFAULTS.enableHighAccuracy);
+const optMaximumAge = ref<number>(DEFAULTS.maximumAge);
+const optTimeout = ref<number>(DEFAULTS.timeout);
+const providerKind = ref<ProviderKind>(providerRegistry.getActiveKind());
 
 type Applied = { minAccuracyM: number; settleMs: number; options: { enableHighAccuracy: boolean; maximumAge: number; timeout: number } };
 const lastApplied = ref<Applied | null>(null);
@@ -216,6 +292,29 @@ const dirty = computed(() =>
     applied.options.maximumAge !== optMaximumAge.value ||
     applied.options.timeout !== optTimeout.value
   );
+});
+
+const lastProviderMeta = ref<LocationStreamMetaEvent | null>(null);
+
+const providerDisplay = computed(() =>
+{
+  const provider = gps.value?.provider ?? providerKind.value ?? null;
+  const label = formatProvider(provider);
+  return label || '—';
+});
+
+const providerStatusText = computed(() =>
+{
+  const meta = lastProviderMeta.value;
+  if (!meta) return '';
+  const providerLabel = formatProvider(meta.provider) || meta.provider;
+  if (!providerLabel) return '';
+  if (meta.previous && meta.previous !== meta.provider)
+  {
+    const previousLabel = formatProvider(meta.previous) || meta.previous;
+    return `Provider switched to ${ providerLabel } (was ${ previousLabel }) at ${ formatTimestamp(meta.at) }`;
+  }
+  return `Provider active: ${ providerLabel } at ${ formatTimestamp(meta.at) }`;
 });
 
 // Fix counters and settle reasoning
@@ -274,7 +373,14 @@ async function restartWatch ()
     watching.value = true;
     if (!sub) sub = locationStream.updates.subscribe((s) =>
     {
-      gps.value = { lat: s.lat, lon: s.lon, accuracy: s.accuracy, altitude: s.altitude ?? null, ts: s.timestamp };
+      gps.value = {
+        lat: s.lat,
+        lon: s.lon,
+        accuracy: s.accuracy,
+        altitude: s.altitude ?? null,
+        ts: s.timestamp,
+        provider: s.provider
+      };
     });
   }
   lastApplied.value = cfg;
@@ -298,22 +404,36 @@ function onProviderChange ()
 
 function applyDefaults ()
 {
-  minAccuracyM.value = 10;
-  settleMs.value = 15000;
-  optEnableHighAccuracy.value = true;
-  optMaximumAge.value = 0;
-  optTimeout.value = 30000;
+  minAccuracyM.value = DEFAULTS.minAccuracyM;
+  settleMs.value = DEFAULTS.settleMs;
+  optEnableHighAccuracy.value = DEFAULTS.enableHighAccuracy;
+  optMaximumAge.value = DEFAULTS.maximumAge;
+  optTimeout.value = DEFAULTS.timeout;
 }
+
+const formatAccuracyBase = (value?: number | null): string | null =>
+{
+  if (value == null) return null;
+  const feet = m2ft(value);
+  const feetText = feet != null ? `${ feet.toFixed(0) } ft` : '';
+  return feetText ? `${ value.toFixed(0) } m (${ feetText })` : `${ value.toFixed(0) } m`;
+};
+
+const formatAccuracyWithProvider = (value?: number | null, provider?: ProviderKind | null): string =>
+{
+  const base = formatAccuracyBase(value);
+  if (!base) return '—';
+  const providerLabel = formatProvider(provider ?? null);
+  return providerLabel ? `${ base } via ${ providerLabel }` : base;
+};
 
 const curAccText = computed(() =>
 {
-  const a = gps.value?.accuracy;
-  return a != null ? `${ a.toFixed(0) } m (${ m2ft(a)?.toFixed(0) } ft)` : '—';
+  return formatAccuracyWithProvider(gps.value?.accuracy, gps.value?.provider ?? providerKind.value);
 });
 const bestAccText = computed(() =>
 {
-  const a = best.value?.accuracy;
-  return a != null ? `${ a.toFixed(0) } m (${ m2ft(a)?.toFixed(0) } ft)` : '—';
+  return formatAccuracyBase(best.value?.accuracy) ?? '—';
 });
 
 const reachedTarget = computed(() =>
@@ -387,6 +507,22 @@ async function runDiagnostics ()
 
 onMounted(async () =>
 {
+  metaSub = locationStream.meta$.subscribe((meta) =>
+  {
+    lastProviderMeta.value = meta;
+    if (providerKind.value !== meta.provider)
+    {
+      providerKind.value = meta.provider;
+    }
+    if (meta.previous && meta.previous !== meta.provider)
+    {
+      console.info('[DebugPage] provider changed', meta);
+    } else
+    {
+      console.debug('[DebugPage] provider meta', meta);
+    }
+  });
+
   // Start watch immediately with current UI config
   try
   {
@@ -420,6 +556,8 @@ onBeforeUnmount(() =>
 {
   try { removeHeadingListener?.(); } catch (e) { console.warn('[DebugPage] removeHeadingListener failed', e); }
   removeHeadingListener = null;
+  try { metaSub?.unsubscribe(); } catch { }
+  metaSub = null;
   try { sub?.unsubscribe(); } catch { }
   sub = null;
 });
@@ -427,20 +565,22 @@ onBeforeUnmount(() =>
 // --- Shared helpers
 async function ensurePermissions (): Promise<boolean>
 {
-  try
+  const ok = await locationStream.ensureProviderPermissions();
+  if (!ok)
   {
-    const status = await Geolocation.checkPermissions();
-    const granted = (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
-    if (granted) return true;
-    const req = await Geolocation.requestPermissions();
-    return (req as any).location === 'granted' || (req as any).coarseLocation === 'granted' || (req as any).fineLocation === 'granted';
-  } catch { return true; }
+    permissionAlert.show({
+      header: 'Location Permission Required',
+      message: 'Open settings to enable location access so background tracking can start.'
+    });
+  }
+  return ok;
 }
 
 const m2ft = (m?: number) => (m == null ? undefined : m * 3.28084);
 
 import type { Subscription } from 'rxjs';
 let sub: Subscription | null = null;
+let metaSub: Subscription | null = null;
 </script>
 <style scoped>
 .telemetry {
@@ -457,6 +597,12 @@ let sub: Subscription | null = null;
 .telemetry-item .value {
   font-size: 1.2rem;
   font-weight: 600;
+}
+
+.provider-status {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
 }
 
 .controls {

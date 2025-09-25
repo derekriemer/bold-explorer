@@ -16,6 +16,25 @@ export class FakeableProvider implements LocationProvider
 
   isActive (): boolean { return this.active; }
 
+  async ensurePermissions (): Promise<boolean>
+  {
+    return true;
+  }
+
+  async getCurrent (): Promise<LocationSample | null>
+  {
+    if (!this.cur)
+    {
+      return null;
+    }
+    return {
+      lat: this.cur.lat,
+      lon: this.cur.lon,
+      timestamp: this.clock,
+      provider: 'mock'
+    };
+  }
+
   async start (
     _opts: Required<ProviderOptions>,
     onSample: (s: LocationSample) => void,

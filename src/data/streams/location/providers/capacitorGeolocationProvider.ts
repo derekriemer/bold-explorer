@@ -1,10 +1,41 @@
 import { LocationProvider, LocationSample, ProviderOptions } from '@/types';
-import { Geolocation, type Position, type PositionOptions } from '@capacitor/geolocation';
+import { Geolocation, type PermissionStatus, type Position, type PositionOptions } from '@capacitor/geolocation';
 
 export class GeolocationProvider implements LocationProvider
 {
     private watchId: string | null = null;
     isActive () { return this.watchId !== null; }
+
+    async ensurePermissions (): Promise<boolean>
+    {
+        try
+        {
+            const status: PermissionStatus = await Geolocation.checkPermissions();
+            const granted = isLocationGranted(status);
+            if (granted) return true;
+            const req: PermissionStatus = await Geolocation.requestPermissions();
+            return isLocationGranted(req);
+        }
+        catch (err)
+        {
+            console.warn('[GeolocationProvider] ensurePermissions failed', err);
+            return false;
+        }
+    }
+
+    async getCurrent (opts: Partial<ProviderOptions>): Promise<LocationSample | null>
+    {
+        try
+        {
+            const position = await Geolocation.getCurrentPosition(toPositionOptions(opts));
+            return positionToSample(position);
+        }
+        catch (err)
+        {
+            console.warn('[GeolocationProvider] getCurrent failed', err);
+            return null;
+        }
+    }
 
     async start (
         opts: Required<ProviderOptions>,
@@ -12,12 +43,7 @@ export class GeolocationProvider implements LocationProvider
         onError: (e: unknown) => void
     ): Promise<void>
     {
-        const posOpts: PositionOptions = {
-            enableHighAccuracy: true,        // Always burn high accuracy; this is a GPS app.
-            timeout: opts.timeoutMs,
-            maximumAge: opts.maximumAgeMs,
-            minimumUpdateInterval: 1000
-        };
+        const posOpts = toPositionOptions(opts);
 
         // Seed with one fix (optional but helpful)
         try
@@ -58,4 +84,19 @@ function positionToSample (p: Position): LocationSample
         provider: 'geolocation',
         raw: p
     };
+}
+
+function toPositionOptions (opts: Partial<ProviderOptions>): PositionOptions
+{
+    return {
+        enableHighAccuracy: true,
+        timeout: opts.timeoutMs,
+        maximumAge: opts.maximumAgeMs,
+        minimumUpdateInterval: 1000
+    };
+}
+
+function isLocationGranted (status: PermissionStatus): boolean
+{
+    return (status as any).location === 'granted' || (status as any).coarseLocation === 'granted' || (status as any).fineLocation === 'granted';
 }

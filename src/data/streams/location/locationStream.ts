@@ -14,6 +14,32 @@ import { toLatLng } from '@/types';
 import type { LocationSample, WatchOptions, ProviderOptions, LocationProvider, ProviderKind } from '@/types';
 import { providerRegistry } from './providerRegistry';
 
+type LocationStreamMetaEvent = {
+    type: 'provider';
+    provider: ProviderKind;
+    previous: ProviderKind | null;
+    at: number;
+};
+
+/**
+ * Background fixes tend to arrive with lower precision than foreground GPS.
+ * Relax the accuracy gate so we still surface a best-effort position instead of dropping every update.
+ */
+const BACKGROUND_ACCURACY_FLOOR = 50;
+
+function isAccuracyAcceptable (sample: LocationSample, minAccuracy?: number | null): boolean
+{
+    if (!minAccuracy) return true;
+    const accuracy = sample.accuracy;
+    if (typeof accuracy !== 'number' || Number.isNaN(accuracy)) return true;
+
+    const limit = sample.provider === 'background'
+        ? Math.max(minAccuracy, BACKGROUND_ACCURACY_FLOOR)
+        : minAccuracy;
+
+    return accuracy <= limit;
+}
+
 // ---------------- The stream singleton ------------------------------
 
 class LocationStream
@@ -23,8 +49,13 @@ class LocationStream
     public readonly updates: Observable<LocationSample> = this.subject.asObservable()
         .pipe(filter((v): v is LocationSample => v !== null));
 
+    private readonly metaSubject: BehaviorSubject<LocationStreamMetaEvent>;
+    /** Diagnostic/meta channel for provider + lifecycle events */
+    public readonly meta$: Observable<LocationStreamMetaEvent>;
+
     /** Provider + configs */
     private provider: LocationProvider;
+    private providerKind: ProviderKind;
     private providerOpts: Required<ProviderOptions> = {
         timeoutMs: 30000,
         maximumAgeMs: 0
@@ -47,17 +78,30 @@ class LocationStream
 
     constructor(provider?: LocationProvider)
     {
+        const activeKind = providerRegistry.getActiveKind();
         const active = provider ?? providerRegistry.getActiveProvider();
         this.provider = active;
+        this.providerKind = activeKind;
+
+        const initialMeta: LocationStreamMetaEvent = {
+            type: 'provider',
+            provider: activeKind,
+            previous: null,
+            at: Date.now()
+        };
+        this.metaSubject = new BehaviorSubject<LocationStreamMetaEvent>(initialMeta);
+        this.meta$ = this.metaSubject.asObservable();
+
         // React to registry changes by swapping provider and preserving watch state
-        providerRegistry.active$.subscribe(({ provider: p }) => { void this.swapProvider(p); });
+        providerRegistry.active$.subscribe(({ provider: p, kind }) => { void this.swapProvider(p, kind); });
     }
 
     /** Swap in a new provider (e.g., BackgroundProvider, MockProvider). */
-    private async swapProvider (next: LocationProvider): Promise<void>
+    private async swapProvider (next: LocationProvider, nextKind: ProviderKind): Promise<void>
     {
         const resume = this.shouldBeWatching;
         const prev = this.provider;
+        const prevKind = this.providerKind;
 
         if (resume && prev && prev.isActive())
         {
@@ -69,6 +113,19 @@ class LocationStream
         }
 
         this.provider = next;
+        this.providerKind = nextKind;
+
+        if (nextKind !== prevKind)
+        {
+            const meta: LocationStreamMetaEvent = {
+                type: 'provider',
+                provider: nextKind,
+                previous: prevKind,
+                at: Date.now()
+            };
+            this.metaSubject.next(meta);
+            console.info('[locationStream] provider changed', { from: prevKind, to: nextKind });
+        }
 
         if (resume)
         {
@@ -91,6 +148,39 @@ class LocationStream
     /** Whether the underlying provider is active */
     public isWatching (): boolean { return this.provider.isActive(); }
 
+    /** Ensure the active provider has required permissions. */
+    public async ensureProviderPermissions (): Promise<boolean>
+    {
+        if (typeof this.provider.ensurePermissions === 'function')
+        {
+            try { return await this.provider.ensurePermissions(); }
+            catch (err)
+            {
+                console.warn('[locationStream] ensureProviderPermissions failed', err);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Fetch a snapshot from the provider or fall back to the last emitted sample. */
+    public async getCurrentSnapshot (partial?: Partial<ProviderOptions>): Promise<LocationSample | null>
+    {
+        if (typeof this.provider.getCurrent === 'function')
+        {
+            try
+            {
+                const sample = await this.provider.getCurrent({ ...this.providerOpts, ...partial });
+                if (sample) return sample;
+            }
+            catch (err)
+            {
+                console.warn('[locationStream] getCurrentSnapshot provider fallback failed', err);
+            }
+        }
+        return this.subject.getValue();
+    }
+
     /** Start watching; providers emit raw samples, we apply gates. */
     async start ()
     {
@@ -109,6 +199,19 @@ class LocationStream
         this.starting = true;
         try
         {
+            if (typeof this.provider.ensurePermissions === 'function')
+            {
+                const ok = await this.provider.ensurePermissions();
+                if (!ok)
+                {
+                    const err = new Error('Location provider permissions were not granted');
+                    (err as any).code = 'PERMISSION_DENIED';
+                    this.handleProviderError(err);
+                    this.shouldBeWatching = false;
+                    return;
+                }
+            }
+
             await this.provider.start(
                 this.providerOpts,
                 (s) => this.emitIfPasses(s),
@@ -148,8 +251,8 @@ class LocationStream
 
     private emitIfPasses (s: LocationSample)
     {
-        // Accuracy filter
-        if (this.opts.minAccuracyM && typeof s.accuracy === 'number' && s.accuracy > this.opts.minAccuracyM) return;
+        // Accuracy filter (relaxed when background provider is active)
+        if (!isAccuracyAcceptable(s, this.opts.minAccuracyM)) return;
 
         // Interval throttle
         const now = Date.now();
@@ -207,5 +310,12 @@ class LocationStream
 }
 
 export const locationStream = new LocationStream();
-export { LocationStream };
-export type { LocationSample, WatchOptions, ProviderOptions, LocationProvider, ProviderKind };
+export { LocationStream, isAccuracyAcceptable };
+export type {
+    LocationSample,
+    WatchOptions,
+    ProviderOptions,
+    LocationProvider,
+    ProviderKind,
+    LocationStreamMetaEvent
+};

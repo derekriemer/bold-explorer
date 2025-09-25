@@ -78,6 +78,10 @@
       </ion-fab>
     </ion-content>
 
+    <ion-alert :is-open=" permissionAlert.isOpen " :header=" permissionAlert.header "
+      :message=" permissionAlert.message " :buttons=" permissionAlertButtons "
+      @didDismiss=" permissionAlert.dismiss " />
+
     <ion-modal :is-open=" alignmentActive " @didDismiss=" closeAlignment ">
       <ion-header>
         <ion-toolbar>
@@ -89,7 +93,7 @@
       </ion-header>
       <ion-content>
         <div class="alignment-modal">
-          <div class="alignment-hero" aria-live="polite">
+          <div class="alignment-hero">
             <div class="alignment-target">{{ alignmentBearingText }}</div>
             <div v-if="alignmentStatusText" class="alignment-status">{{ alignmentStatusText }}</div>
           </div>
@@ -147,12 +151,12 @@ import
   IonButtons,
   IonItem,
   IonInput,
+  IonAlert,
 } from '@ionic/vue';
 import { computed, onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
-import { Geolocation, type PositionOptions } from '@capacitor/geolocation';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useCollections } from '@/stores/useCollections';
@@ -165,12 +169,13 @@ import { useBearingDistance } from '@/composables/useBearingDistance';
 import { useTarget } from '@/composables/useTarget';
 import { useWaypointActions } from '@/composables/useWaypointActions';
 import { useFollowTrail } from '@/composables/useFollowTrail';
-import { ensureLocationGranted } from '@/composables/usePermissions';
 import { useBearingAlignment } from '@/composables/useBearingAlignment';
+import { usePermissionAlert } from '@/composables/usePermissionAlert';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import GpsScopePanel from '@/components/gps/GpsScopePanel.vue';
 import { toLatLng } from '@/types';
+import { locationStream } from '@/data/streams/location';
 
 const trails = useTrails();
 const waypointsStore = useWaypoints();
@@ -180,6 +185,31 @@ const prefs = usePrefsStore();
 const actions = useActions();
 const route = useRoute();
 const compassRegionLabelId = 'gps-compass-label';
+const permissionAlert = usePermissionAlert();
+const permissionAlertButtons = [
+  {
+    text: 'Not now',
+    role: 'cancel',
+    handler: () => { permissionAlert.dismiss(); }
+  },
+  {
+    text: 'Open Settings',
+    handler: () => permissionAlert.openSettings()
+  }
+] as const;
+
+async function ensureLocationPermission (): Promise<boolean>
+{
+  const ok = await locationStream.ensureProviderPermissions();
+  if (!ok)
+  {
+    permissionAlert.show({
+      header: 'Location Permission Required',
+      message: 'Enable location access in system settings to unlock GPS tracking and compass guidance.'
+    });
+  }
+  return ok;
+}
 
 type AlignmentInputElement = HTMLElement & { setFocus?: () => Promise<void> };
 type AlignmentInputEvent = CustomEvent<{ value?: string | null }>;
@@ -487,24 +517,28 @@ async function toggleFollow ()
 
 async function recenter ()
 {
-  const opts: PositionOptions = { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 };
   try
   {
-    const pos = await Geolocation.getCurrentPosition(opts);
-    loc.current = {
-      lat: pos.coords.latitude,
-      lon: pos.coords.longitude,
-      accuracy: pos.coords.accuracy ?? undefined,
-      altitude: pos.coords.altitude ?? null,
-      heading: pos.coords.heading ?? null,
-      speed: pos.coords.speed ?? null,
-      timestamp: (pos as any).timestamp ?? Date.now(),
-      provider: 'geolocation',
-      raw: pos,
-    } as any;
+    const sample = await locationStream.getCurrentSnapshot({ timeoutMs: 5000 });
+    if (!sample)
+    {
+      permissionAlert.show({
+        header: 'Location Unavailable',
+        message: 'Unable to retrieve a GPS fix. Ensure location services are enabled and try again.'
+      });
+      return;
+    }
+    loc.current = sample;
   } catch (e)
   {
     console.warn('[GpsPage] recenter failed', e);
+    if ((e as any)?.code === 1)
+    {
+      permissionAlert.show({
+        header: 'Location Permission Required',
+        message: 'Location access appears to be disabled. Open settings to re-enable GPS tracking.'
+      });
+    }
   }
 }
 
@@ -566,19 +600,11 @@ onMounted(async () =>
   await Promise.all([trails.refresh(), waypointsStore.refreshAll(), collections.refresh()]);
   try
   {
-    const ok = await ensureLocationGranted();
+    const ok = await ensureLocationPermission();
     if (ok)
     {
       await loc.start();
       await recenter();
-    } else
-    {
-      actions.show('Location permission denied. Enable it in Settings to use GPS features.', {
-        kind: 'error',
-        placement: 'banner-top',
-        durationMs: null,
-        dismissLabel: 'Dismiss',
-      });
     }
   } catch (e)
   {

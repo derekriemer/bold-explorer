@@ -17,8 +17,10 @@ Run from `bold_explorer/` and use pnpm:
 - Dependencies: use pnpm only; always commit `pnpm-lock.yaml` for reproducible installs. Do not use npm, Yarn, or Bun without explicit user approval.
 - `pnpm dev`: Start Vite dev server (Ionic Vue app).
 - `pnpm build`: Type-check with `vue-tsc`, then build to `dist/`.
+- `pnpm build:agent`: Same as `build` but forces Rollup's JS fallback (useful in sandboxed Linux containers).
 - `pnpm preview`: Serve the production build locally.
 - `pnpm test:unit`: Run Vitest unit tests (jsdom env).
+- `pnpm test:agent:unit`: Vitest with Rollup's JS fallback for environments without native binaries (ensure dependencies were installed on that platform so Rollup's optional package is available).
 - `pnpm test:e2e`: Run Cypress end-to-end tests.
 - `pnpm lint`: Lint with ESLint.
 

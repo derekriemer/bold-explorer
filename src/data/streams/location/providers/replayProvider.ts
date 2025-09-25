@@ -31,6 +31,31 @@ export class ReplayProvider implements LocationProvider
 
   isActive (): boolean { return this.active; }
 
+  async ensurePermissions (): Promise<boolean>
+  {
+    return true;
+  }
+
+  async getCurrent (): Promise<LocationSample | null>
+  {
+    const p = this.points[this.idx] ?? this.points[0];
+    if (!p)
+    {
+      return null;
+    }
+    const ts = p.timestamp ?? this.clock;
+    return {
+      lat: p.lat,
+      lon: p.lon,
+      accuracy: p.accuracy,
+      altitude: p.altitude ?? null,
+      heading: p.heading ?? null,
+      speed: p.speed ?? null,
+      timestamp: ts,
+      provider: 'replay'
+    };
+  }
+
   async start (
     _opts: Required<ProviderOptions>,
     onSample: (s: LocationSample) => void,

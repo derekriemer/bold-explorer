@@ -24,6 +24,12 @@ export interface LocationProvider
 
     /** True if provider is actively producing samples. */
     isActive (): boolean;
+
+    /** Ensure the required permissions are granted (optional for providers that do not need any). */
+    ensurePermissions? (): Promise<boolean>;
+
+    /** Fetch a one-off sample without maintaining a watch (optional). */
+    getCurrent? (opts: Partial<ProviderOptions>): Promise<LocationSample | null>;
 }
 
 // todo (codex): Document me

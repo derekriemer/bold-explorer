@@ -50,14 +50,14 @@ class ProviderRegistry
   /** Get or construct a provider instance for a kind (does not switch active). */
   get (kind: ProviderKind): LocationProvider
   {
-    const resolved = this.resolvePreferredKind(kind);
+    const resolved = this.resolvePreferredKind(kind, { explicit: false });
     return this.instantiate(resolved);
   }
 
   /** Switch the active provider kind and emit via Rx. */
   switchTo (kind: ProviderKind): LocationProvider
   {
-    const resolved = this.resolvePreferredKind(kind);
+    const resolved = this.resolvePreferredKind(kind, { explicit: true });
     const cur = this.state$.getValue();
     if (cur.kind === resolved) return cur.provider;
     const p = this.instantiate(resolved);
@@ -78,16 +78,18 @@ class ProviderRegistry
     return this.instances[kind]!;
   }
 
-  private resolvePreferredKind (requested?: ProviderKind): ProviderKind
+  private resolvePreferredKind (requested?: ProviderKind, opts: { explicit: boolean } = { explicit: false }): ProviderKind
   {
     if (!requested)
     {
       if (BackgroundGeolocationProvider.isSupported()) return 'background';
+      console.info('[providerRegistry] background provider unsupported; defaulting to geolocation');
       return 'geolocation';
     }
 
-    if (requested === 'background' && !BackgroundGeolocationProvider.isSupported())
+    if (requested === 'background' && !BackgroundGeolocationProvider.isSupported() && !opts.explicit)
     {
+      console.info('[providerRegistry] background provider unsupported; keeping geolocation active');
       return 'geolocation';
     }
 

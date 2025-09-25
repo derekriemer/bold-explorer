@@ -29,6 +29,10 @@ Guidance for contributors/agents:
   - [x] undo: only when allowed; calls onUndo; removes from undoStack
   - [x] undoLast: LIFO; clears both stacks appropriately
   - [x] clearAll: empties actions and undoStack
+- [x] `tests/unit/data/streams/locationStream.spec.ts`
+  - [x] background provider relaxes accuracy gating to allow moderate fixes
+- [x] `tests/unit/composables/usePermissionAlert.spec.ts`
+  - [x] opens plugin settings when available and falls back to App API otherwise
 
 ## Phase 2: Composables (no native deps)
 

@@ -46,7 +46,9 @@ export class WaypointsRepo {
   /**
    * Create a waypoint and attach it to the specified trail inside a single transaction.
    */
-  async addToTrail(input: WaypointAddToTrailInput): Promise<{ waypointId: number; position: number }> {
+  async addToTrail(
+    input: WaypointAddToTrailInput
+  ): Promise<{ waypointId: number; position: number }> {
     assertLatLng(input.latLng);
     return this.db.transaction().execute(async (trx) => {
       const waypointId = await this.insertWaypoint(trx, input);

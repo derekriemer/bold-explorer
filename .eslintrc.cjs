@@ -28,7 +28,8 @@ module.exports = {
     curly: ["error", "all"],
 
     // Standard 1TBS: if (...) { ... } else { ... }
-    "brace-style": ["error", "1tbs", { allowSingleLine: false }],
+    "brace-style": ["error", "1tbs", { allowSingleLine: true }],
+    'space-before-blocks': ['error', 'always'],
   },
   ignorePatterns: ["node_modules/", "dist/", "build/", "coverage/"],
 };

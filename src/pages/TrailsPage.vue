@@ -95,6 +95,7 @@ import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import { useActions } from '@/composables/useActions';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
+import { toLatLng } from '@/types';
 import { exportTrailToGpx } from '@/data/storage/gpx/gpx.service';
 import MultiSelectWizard from '@/components/modals/MultiSelectWizard.vue';
 import type { MultiSelectConfig, MultiSelectItem } from '@/types/multi-select';
@@ -244,7 +245,11 @@ function handleAddWaypoint(data: any, payload?: AddWaypointPayload): boolean {
     return false;
   }
   (async () => {
-    await wps.addToTrail(payload.trailId, { name, lat, lon, elev_m: elev ?? undefined });
+    await wps.addToTrail(payload.trailId, {
+      name,
+      latLng: toLatLng(lat, lon),
+      elev_m: elev ?? undefined
+    });
     await wps.loadForTrail(payload.trailId);
     actions.show('Waypoint added', { kind: 'success' });
   })();

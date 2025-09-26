@@ -1,7 +1,8 @@
+import type { LatLng } from '@/types/latlng';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useActions } from './useActions';
 
-type Point = { name: string; lat: number; lon: number; elev_m: number | null };
+type Point = { name: string; latLng: LatLng; elev_m: number | null };
 
 /**
  * Wrap common waypoint actions with toasts and store updates.

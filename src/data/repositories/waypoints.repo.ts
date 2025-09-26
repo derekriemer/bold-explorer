@@ -1,59 +1,58 @@
 import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import type { DB, Waypoint } from '@/db/schema';
-import { fetchWaypointsWithDistance, sqlDistanceMetersForAlias } from '@/utils/geo';
+import { fetchWaypointsWithDistance } from '@/utils/geo';
+import { assertLatLng } from '@/types/latlng';
 import type { LatLng } from '@/types/latlng';
 
-// CODEX: give this class a docstring.
-// codex: Give public surfaces of the repo docstrings.
-// codex:  make create and update take a latLng and refactor codebase to pass in a latLng so that things here are sanatized and safe.
-// codex: Private field issues mentioned here  previously are resolved, make attachToTrail, addToTrail, create use sql transactions.
+type WaypointCreateInput = {
+  name: string;
+  latLng: LatLng;
+  elev_m?: number | null;
+};
+
+type WaypointAddToTrailInput = WaypointCreateInput & {
+  trailId: number;
+  position?: number;
+};
+
+/**
+ * Data access layer for waypoint records, including creation, trail attachment,
+ * ordering, and geo-distance queries. All public mutations validate coordinates
+ * via branded {@link LatLng} values to prevent invalid writes.
+ */
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}
 
+  /**
+   * Fetch every waypoint in insertion order.
+   */
   all(): Promise<Selectable<Waypoint>[]> {
     return this.db.selectFrom('waypoint').selectAll().execute();
   }
 
-  async create(input: {
-    name: string;
-    lat: number;
-    lon: number;
-    elev_m?: number | null;
-  }): Promise<number> {
-    // Defensive validation for coordinate ranges
-    const validLat = Number.isFinite(input.lat) && input.lat >= -90 && input.lat <= 90;
-    const validLon = Number.isFinite(input.lon) && input.lon >= -180 && input.lon <= 180;
-    if (!validLat || !validLon) {
-      throw new Error(
-        'Invalid coordinates: latitude must be in [-90, 90], longitude in [-180, 180]'
-      );
-    }
-    const res = await this.db
-      .insertInto('waypoint')
-      .values({
-        name: input.name,
-        lat: input.lat,
-        lon: input.lon,
-        elev_m: input.elev_m ?? null,
-        created_at: new Date().toISOString(),
-      })
-      .returning('id')
-      .executeTakeFirst();
-    return Number(res!.id);
+  /**
+   * Insert a waypoint with validated coordinates, returning the new primary key.
+   *
+   * @throws TypeError if {@link LatLng} validation fails.
+   */
+  async create(input: WaypointCreateInput): Promise<number> {
+    assertLatLng(input.latLng);
+    return this.db.transaction().execute(async (trx) => {
+      return this.insertWaypoint(trx, input);
+    });
   }
 
-  async addToTrail(input: {
-    trailId: number;
-    name: string;
-    lat: number;
-    lon: number;
-    elev_m?: number | null;
-    position?: number;
-  }): Promise<{ waypointId: number; position: number }> {
-    const waypointId = await this.create(input);
-    const position = await this.attachToTrail(this.db, input.trailId, waypointId, input.position);
-    return { waypointId, position };
+  /**
+   * Create a waypoint and attach it to the specified trail inside a single transaction.
+   */
+  async addToTrail(input: WaypointAddToTrailInput): Promise<{ waypointId: number; position: number }> {
+    assertLatLng(input.latLng);
+    return this.db.transaction().execute(async (trx) => {
+      const waypointId = await this.insertWaypoint(trx, input);
+      const position = await this.attachToTrail(trx, input.trailId, waypointId, input.position);
+      return { waypointId, position };
+    });
   }
 
   private async attachToTrail(
@@ -85,10 +84,18 @@ export class WaypointsRepo {
     return position;
   }
 
+  /**
+   * Attach an existing waypoint to a trail, shifting neighboring positions as needed.
+   */
   async attach(trailId: number, waypointId: number, position?: number): Promise<number> {
-    return this.attachToTrail(this.db, trailId, waypointId, position);
+    return this.db.transaction().execute(async (trx) => {
+      return this.attachToTrail(trx, trailId, waypointId, position);
+    });
   }
 
+  /**
+   * List waypoints for a trail ordered by their positional index.
+   */
   forTrail(trailId: number): Promise<Selectable<Waypoint>[]> {
     return this.db
       .selectFrom('trail_waypoint as tw')
@@ -99,6 +106,9 @@ export class WaypointsRepo {
       .execute();
   }
 
+  /**
+   * Update the positional index for a waypoint within a trail, compacting the remaining rows.
+   */
   async setPosition(trailId: number, waypointId: number, position: number): Promise<void> {
     await this.db.transaction().execute(async (trx: Kysely<DB>) => {
       const current = await trx
@@ -136,6 +146,9 @@ export class WaypointsRepo {
     });
   }
 
+  /**
+   * Detach a waypoint from a trail and collapse higher positions to fill the gap.
+   */
   async detach(trailId: number, waypointId: number): Promise<void> {
     await this.db.transaction().execute(async (trx: Kysely<DB>) => {
       const row = await trx
@@ -160,6 +173,9 @@ export class WaypointsRepo {
     });
   }
 
+  /**
+   * Rename a waypoint by primary key.
+   */
   rename(id: number, name: string): Promise<void> {
     return this.db
       .updateTable('waypoint')
@@ -169,26 +185,34 @@ export class WaypointsRepo {
       .then(() => {});
   }
 
+  /**
+   * Apply partial updates to a waypoint. Coordinate changes require a validated {@link LatLng}.
+   */
   async update(
     id: number,
     patch: {
       name?: string;
-      lat?: number;
-      lon?: number;
+      latLng?: LatLng;
       elev_m?: number | null;
       description?: string | null;
     }
   ): Promise<void> {
     const upd: any = {};
     if (patch.name != null) upd.name = patch.name;
-    if (patch.lat != null) upd.lat = patch.lat;
-    if (patch.lon != null) upd.lon = patch.lon;
+    if (patch.latLng != null) {
+      assertLatLng(patch.latLng);
+      upd.lat = patch.latLng.lat;
+      upd.lon = patch.latLng.lon;
+    }
     if (patch.elev_m !== undefined) upd.elev_m = patch.elev_m;
     if (patch.description !== undefined) upd.description = patch.description;
     if (Object.keys(upd).length === 0) return;
     await this.db.updateTable('waypoint').set(upd).where('id', '=', id).execute();
   }
 
+  /**
+   * Remove a waypoint and clean up join-table references.
+   */
   async remove(id: number): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       await trx.deleteFrom('trail_waypoint').where('waypoint_id', '=', id).execute();
@@ -227,5 +251,20 @@ export class WaypointsRepo {
     opts?: { trailId?: number; limit?: number }
   ): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
     return fetchWaypointsWithDistance(this.db, center, opts);
+  }
+
+  private async insertWaypoint(db: Kysely<DB>, input: WaypointCreateInput): Promise<number> {
+    const res = await db
+      .insertInto('waypoint')
+      .values({
+        name: input.name,
+        lat: input.latLng.lat,
+        lon: input.latLng.lon,
+        elev_m: input.elev_m ?? null,
+        created_at: new Date().toISOString(),
+      })
+      .returning('id')
+      .executeTakeFirst();
+    return Number(res!.id);
   }
 }

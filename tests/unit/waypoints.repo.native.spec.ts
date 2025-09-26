@@ -3,6 +3,7 @@ import { Kysely, SqliteDialect } from 'kysely';
 import type { DB } from '@/db/schema';
 import { createMigrator } from '@/db/migrations/provider';
 import { WaypointsRepo } from '@/data/repositories/waypoints.repo';
+import { toLatLng } from '@/types/latlng';
 
 // Old/native path using better-sqlite3(':memory:').
 // Gated to run only when DB_NATIVE=1 is set.
@@ -40,7 +41,7 @@ describe.skipIf(!DB_NATIVE_ENABLED || !NATIVE_AVAILABLE)('WaypointsRepo DB (nati
   it('creates and lists a waypoint (timed)', async () => {
     const start = Date.now();
     const repo = new WaypointsRepo(db as any);
-    const id = await repo.create({ name: 'Valid', lat: 12.34, lon: 56.78 });
+    const id = await repo.create({ name: 'Valid', latLng: toLatLng(12.34, 56.78) });
     expect(id).toBeGreaterThan(0);
     const all = await (db as Kysely<DB>)
       .selectFrom('waypoint')

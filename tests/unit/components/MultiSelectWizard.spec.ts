@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import MultiSelectWizard from '@/components/MultiSelectWizard.vue';
+import MultiSelectWizard from '@/components/modals/MultiSelectWizard.vue';
 import type { MultiSelectConfig, MultiSelectItem } from '@/types/multi-select';
 
 function ionStubs() {

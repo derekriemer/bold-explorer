@@ -26,7 +26,7 @@ Run from `bold_explorer/` and use pnpm:
 
 ## Coding Style & Naming Conventions
 
-See STYLE_GUIDE.md for project‑wide style and page organization guidance (imports order, stores/state/computed layout, RxJS patterns, and accessibility notes).
+See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for project‑wide style and page organization guidance (imports order, stores/state/computed layout, RxJS patterns, and accessibility notes).
 
 ## Testing Guidelines
 
@@ -34,7 +34,7 @@ See STYLE_GUIDE.md for project‑wide style and page organization guidance (impo
 - E2E tests: add Cypress specs under `tests/e2e/specs/`, name `*.cy.ts`.
 - Run locally: `pnpm test:unit` and `pnpm test:e2e`.
 - Aim for meaningful assertions (rendered text, route changes, and component behavior). Keep tests fast and deterministic.
-- Reference testing_plan.md when needed to determine if the feature you are working on has tests yet.
+- Reference [testing_plan.md](./testing_plan.md) when needed to determine if the feature you are working on has tests yet.
 
 ## Commit & Pull Request Guidelines
 
@@ -80,7 +80,6 @@ MSG
 - Treat a prompt starting with `BUG:`, `FEAT:`, or `CHORE:` as a strong hint to commit using the matching Conventional Commit type (`fix:`, `feat:`, `chore:`).
 - Commit messages must be thorough: imperative subject plus descriptive body covering motivation, approach, side effects, and verification.
 - Example:
-
   - `git add <files> && git commit -m "chore: align lint settings with Vue 3" -m "Explain rule changes, affected files, and local test/lint results."`
   - Or using the preferred here‑doc style for multi‑line bodies (recommended):
 

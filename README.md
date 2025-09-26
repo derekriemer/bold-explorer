@@ -14,13 +14,15 @@ Bold Explorer is a trail and waypoint navigation app for the blind designed to w
 - Settings: units, compass mode, audio cues; Debug page for diagnostics. Sticky header provides quick Settings/Debug.
 - Tech: Ionic Vue + Pinia; SQLite via Kysely; DI via Pinia plugin; Capacitor for Filesystem/Preferences/Geolocation/Heading. Works on android and organization works on web, in theory works on IOS.
 
-See `WAYPOINT_TRAIL_SPEC.md` for the architecture and detailed behavior.
+See [WAYPOINT_TRAIL_SPEC.md](./WAYPOINT_TRAIL_SPEC.md) for the architecture and detailed behavior.
 
 ## Style Guide
 
 For page organization, coding conventions, and RxJS patterns, see the project Style Guide:
 
-- STYLE_GUIDE.md
+- [STYLE_GUIDE.md](./STYLE_GUIDE.md)
+
+When writing code, edits that do not comply with the style guide will be rejected. This is especially true for things related to type lazyness and lack of documentation.
 
 ## Repository Layout
 
@@ -89,7 +91,7 @@ Notes
 
 Conventions
 
-- Instructions tell agents to keep `testing_plan.md` up-to-date; check items as tests are added and passing. Humans should do this as well.
+- Instructions tell agents to keep [testing_plan.md](./testing_plan.md) up-to-date; check items as tests are added and passing. Humans should do this as well.
 - DB-backed unit tests use an in-memory SQLite created via `createTestDb()`. Fixtures set up and tear down the db per test lifecycle.
 
 Recommended test patterns (from the spec):
@@ -100,7 +102,7 @@ Recommended test patterns (from the spec):
 
 ## Design Spec
 
-- The design is in `WAYPOINT_TRAIL_SPEC.md` (schema, migrations, repo APIs, UI expectations). Update the spec to reflect the latest code as the project evolves.
+- The design is in [WAYPOINT_TRAIL_SPEC.md](./WAYPOINT_TRAIL_SPEC.md) (schema, migrations, repo APIs, UI expectations). Update the spec to reflect the latest code as the project evolves.
 
 ## Troubleshooting
 

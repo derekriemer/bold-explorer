@@ -4,9 +4,10 @@ import type { DB, Waypoint } from '@/db/schema';
 import { fetchWaypointsWithDistance, sqlDistanceMetersForAlias } from '@/utils/geo';
 import type { LatLng } from '@/types/latlng';
 
-// Degrees-to-radians conversion factor (1° = PI/180 radians)
-const DEG_TO_RAD = Math.PI / 180;
-
+// CODEX: give this class a docstring.
+// codex: Give public surfaces of the repo docstrings.
+// codex:  make create and update take a latLng and refactor codebase to pass in a latLng so that things here are sanatized and safe.
+// codex: Private field issues mentioned here  previously are resolved, make attachToTrail, addToTrail, create use sql transactions.
 export class WaypointsRepo {
   constructor(private db: Kysely<DB>) {}
 
@@ -14,12 +15,19 @@ export class WaypointsRepo {
     return this.db.selectFrom('waypoint').selectAll().execute();
   }
 
-  async create(input: { name: string; lat: number; lon: number; elev_m?: number | null }): Promise<number> {
+  async create(input: {
+    name: string;
+    lat: number;
+    lon: number;
+    elev_m?: number | null;
+  }): Promise<number> {
     // Defensive validation for coordinate ranges
     const validLat = Number.isFinite(input.lat) && input.lat >= -90 && input.lat <= 90;
     const validLon = Number.isFinite(input.lon) && input.lon >= -180 && input.lon <= 180;
     if (!validLat || !validLon) {
-      throw new Error('Invalid coordinates: latitude must be in [-90, 90], longitude in [-180, 180]');
+      throw new Error(
+        'Invalid coordinates: latitude must be in [-90, 90], longitude in [-180, 180]'
+      );
     }
     const res = await this.db
       .insertInto('waypoint')
@@ -28,21 +36,32 @@ export class WaypointsRepo {
         lat: input.lat,
         lon: input.lon,
         elev_m: input.elev_m ?? null,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .returning('id')
       .executeTakeFirst();
     return Number(res!.id);
   }
 
-  async addToTrail(input: { trailId: number; name: string; lat: number; lon: number; elev_m?: number | null; position?: number }): Promise<{ waypointId: number; position: number }> {
-    // Avoid transaction on web/sql.js driver to prevent private field binding issues
+  async addToTrail(input: {
+    trailId: number;
+    name: string;
+    lat: number;
+    lon: number;
+    elev_m?: number | null;
+    position?: number;
+  }): Promise<{ waypointId: number; position: number }> {
     const waypointId = await this.create(input);
     const position = await this.attachToTrail(this.db, input.trailId, waypointId, input.position);
     return { waypointId, position };
   }
 
-  private async attachToTrail(db: Kysely<DB>, trailId: number, waypointId: number, position?: number) {
+  private async attachToTrail(
+    db: Kysely<DB>,
+    trailId: number,
+    waypointId: number,
+    position?: number
+  ) {
     const now = new Date().toISOString();
     if (position == null) {
       const next = await db
@@ -142,10 +161,24 @@ export class WaypointsRepo {
   }
 
   rename(id: number, name: string): Promise<void> {
-    return this.db.updateTable('waypoint').set({ name }).where('id', '=', id).execute().then(() => {});
+    return this.db
+      .updateTable('waypoint')
+      .set({ name })
+      .where('id', '=', id)
+      .execute()
+      .then(() => {});
   }
 
-  async update(id: number, patch: { name?: string; lat?: number; lon?: number; elev_m?: number | null; description?: string | null }): Promise<void> {
+  async update(
+    id: number,
+    patch: {
+      name?: string;
+      lat?: number;
+      lon?: number;
+      elev_m?: number | null;
+      description?: string | null;
+    }
+  ): Promise<void> {
     const upd: any = {};
     if (patch.name != null) upd.name = patch.name;
     if (patch.lat != null) upd.lat = patch.lat;
@@ -162,34 +195,6 @@ export class WaypointsRepo {
       await trx.deleteFrom('collection_waypoint').where('waypoint_id', '=', id).execute();
       await trx.deleteFrom('waypoint').where('id', '=', id).execute();
     });
-  }
-
-  async forLocation(center: LatLng, radiusM: number, opts?: { trailId?: number; limit?: number; includeDistance?: boolean }): Promise<Array<Selectable<Waypoint> & { distance_m?: number }>> {
-    const degLat = radiusM / 111320;
-    const degLon = radiusM / (111320 * Math.cos(center.lat * DEG_TO_RAD));
-    const base = this.db
-      .selectFrom('waypoint as w')
-      .$if(!!opts?.trailId, (qb: any) =>
-        qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
-      )
-      .where('w.lat', '>=', center.lat - degLat)
-      .where('w.lat', '<=', center.lat + degLat)
-      .where('w.lon', '>=', center.lon - degLon)
-      .where('w.lon', '<=', center.lon + degLon);
-
-    const distanceExpr = sqlDistanceMetersForAlias('w', center);
-
-    const rows = await base
-      .select([
-        'w.id', 'w.name', 'w.description', 'w.lat', 'w.lon', 'w.elev_m', 'w.created_at',
-        ...(opts?.includeDistance ? [distanceExpr] : [])
-      ])
-      .$if(!!opts?.includeDistance, (qb: any) => qb.orderBy('distance_m'))
-      .$if(!opts?.includeDistance, (qb: any) => qb.orderBy('w.id'))
-      .execute();
-
-    const nearby = opts?.includeDistance ? rows.filter((r: any) => (r as any).distance_m <= radiusM) : rows;
-    return opts?.limit ? nearby.slice(0, opts.limit) : nearby;
   }
 
   /**
@@ -209,14 +214,18 @@ export class WaypointsRepo {
    *
    * Rationale: SQLite on native/web often lacks trig functions; computing exact distances in JS guarantees
    * consistency. The bbox + coarse sort keep the candidate set small and ordered, so the final JS sort is cheap.
+   * I probably could just ignore bounds checks, most likely app not used at poles or on a ship in the ocean where the constraints matter, but might as well do it correctly.
    *
    * Complexity: O(log N + K log K), where N is total waypoints and K is candidate count (typically small).
    *
-   * @param center Geographic center (degrees) to measure distance from.
+   * @param center Geographic center (degrees) to center the distance search.
    * @param opts Optional filters: `trailId` to restrict to a trail; `limit` for max results (post‑sort).
    * @returns Array of waypoints augmented with `distance_m` (meters), ordered nearest first.
    */
-  async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
+  async withDistanceFrom(
+    center: LatLng,
+    opts?: { trailId?: number; limit?: number }
+  ): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
     return fetchWaypointsWithDistance(this.db, center, opts);
   }
 }

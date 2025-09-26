@@ -1,6 +1,9 @@
 import type { Kysely, Selectable } from 'kysely';
 import type { DB, Trail } from '@/db/schema';
 
+// codex: Class and public surfaces docstrings.
+//codex: transactions around create
+
 export class TrailsRepo {
   constructor(private db: Kysely<DB>) {}
 
@@ -14,7 +17,7 @@ export class TrailsRepo {
       .values({
         name: input.name,
         description: input.description ?? null,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .returning('id')
       .executeTakeFirst();
@@ -22,7 +25,12 @@ export class TrailsRepo {
   }
 
   rename(id: number, name: string): Promise<void> {
-    return this.db.updateTable('trail').set({ name }).where('id', '=', id).execute().then(() => {});
+    return this.db
+      .updateTable('trail')
+      .set({ name })
+      .where('id', '=', id)
+      .execute()
+      .then(() => {});
   }
 
   async remove(id: number): Promise<void> {

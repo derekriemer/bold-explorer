@@ -19,11 +19,11 @@ describe('ActionService', () => {
 
     const id2 = svc.show('Timed', { durationMs: 3000 });
     const list2 = svc.actions;
-    const a2 = list2.find(a => a.id === id2)!;
+    const a2 = list2.find((a) => a.id === id2)!;
     expect(a2.durationMs).toBe(3000);
 
     const id3 = svc.show('Durable', { durationMs: null });
-    const a3 = svc.actions.find(a => a.id === id3)!;
+    const a3 = svc.actions.find((a) => a.id === id3)!;
     expect(a3.durationMs).toBeNull();
   });
 
@@ -49,27 +49,29 @@ describe('ActionService', () => {
     // Undoable
     const onUndo = vi.fn();
     const id2 = svc.show('Yes undo', { canUndo: true, onUndo });
-    expect(svc.undoStack.map(a => a.id)).toContain(id2);
+    expect(svc.undoStack.map((a) => a.id)).toContain(id2);
     svc.undo(id2);
     // removed from actions and undoStack
-    expect(svc.actions.find(a => a.id === id2)).toBeUndefined();
-    expect(svc.undoStack.find(a => a.id === id2)).toBeUndefined();
+    expect(svc.actions.find((a) => a.id === id2)).toBeUndefined();
+    expect(svc.undoStack.find((a) => a.id === id2)).toBeUndefined();
     expect(onUndo).toHaveBeenCalledTimes(1);
   });
 
   it('undoLast: LIFO; clears both stacks appropriately', () => {
     const svc = new ActionService();
     const calls: number[] = [];
-    const mkUndo = (id: number) => () => { calls.push(id); };
+    const mkUndo = (id: number) => () => {
+      calls.push(id);
+    };
     const id1 = svc.show('A', { canUndo: true, onUndo: mkUndo(1) });
     const id2 = svc.show('B', { canUndo: true, onUndo: mkUndo(2) });
     const id3 = svc.show('C', { canUndo: true, onUndo: mkUndo(3) });
-    expect(svc.undoStack.map(a => a.id)).toEqual([id1, id2, id3]);
+    expect(svc.undoStack.map((a) => a.id)).toEqual([id1, id2, id3]);
 
     svc.undoLast();
     expect(calls).toEqual([3]);
-    expect(svc.actions.find(a => a.id === id3)).toBeUndefined();
-    expect(svc.undoStack.map(a => a.id)).toEqual([id1, id2]);
+    expect(svc.actions.find((a) => a.id === id3)).toBeUndefined();
+    expect(svc.undoStack.map((a) => a.id)).toEqual([id1, id2]);
   });
 
   it('clearAll: empties actions and undoStack', () => {
@@ -88,13 +90,13 @@ describe('ActionService', () => {
     const svc = new ActionService();
     const onDismiss = vi.fn();
     const id = svc.show('Timed', { durationMs: 3000, onDismiss });
-    expect(svc.actions.some(a => a.id === id)).toBe(true);
+    expect(svc.actions.some((a) => a.id === id)).toBe(true);
 
     vi.advanceTimersByTime(2999);
-    expect(svc.actions.some(a => a.id === id)).toBe(true);
+    expect(svc.actions.some((a) => a.id === id)).toBe(true);
 
     vi.advanceTimersByTime(1);
-    expect(svc.actions.some(a => a.id === id)).toBe(false);
+    expect(svc.actions.some((a) => a.id === id)).toBe(false);
     expect(onDismiss).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });

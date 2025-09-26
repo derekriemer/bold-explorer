@@ -21,17 +21,27 @@ describe('utils/geo security', () => {
       'w-',
       'w/w',
       'w$',
-      'w\nDROP TABLE waypoint'
+      'w\nDROP TABLE waypoint',
     ];
     for (const a of badAliases) {
-      expect(() => sqlDistanceMetersForAlias(a as any, { lat: 0, lon: 0 })).toThrow(/Invalid SQL alias/);
+      expect(() => sqlDistanceMetersForAlias(a as any, { lat: 0, lon: 0 })).toThrow(
+        /Invalid SQL alias/
+      );
     }
   });
 
   it('rejects out-of-range coordinates', () => {
-    expect(() => sqlDistanceMetersForAlias('w', { lat: 100, lon: 0 } as any)).toThrow(/Invalid LatLng/);
-    expect(() => sqlDistanceMetersForAlias('w', { lat: -91, lon: 0 } as any)).toThrow(/Invalid LatLng/);
-    expect(() => sqlDistanceMetersForAlias('w', { lat: 0, lon: 181 } as any)).toThrow(/Invalid LatLng/);
-    expect(() => sqlDistanceMetersForAlias('w', { lat: 0, lon: -181 } as any)).toThrow(/Invalid LatLng/);
+    expect(() => sqlDistanceMetersForAlias('w', { lat: 100, lon: 0 } as any)).toThrow(
+      /Invalid LatLng/
+    );
+    expect(() => sqlDistanceMetersForAlias('w', { lat: -91, lon: 0 } as any)).toThrow(
+      /Invalid LatLng/
+    );
+    expect(() => sqlDistanceMetersForAlias('w', { lat: 0, lon: 181 } as any)).toThrow(
+      /Invalid LatLng/
+    );
+    expect(() => sqlDistanceMetersForAlias('w', { lat: 0, lon: -181 } as any)).toThrow(
+      /Invalid LatLng/
+    );
   });
 });

@@ -6,7 +6,7 @@
         <PageHeaderToolbar />
       </ion-toolbar>
       <ion-toolbar>
-        <ion-segment v-model=" scope " aria-label="Selection scope">
+        <ion-segment v-model="scope" aria-label="Selection scope">
           <ion-segment-button value="waypoint">
             <ion-label>Waypoint</ion-label>
           </ion-segment-button>
@@ -21,33 +21,56 @@
     </ion-header>
     <ion-content>
       <div class="ion-padding">
-        <GpsScopePanel :scope=" scope " :waypoint=" { selectedId: selectedWaypointId, options: waypointOptions } "
-          :trail=" {
+        <GpsScopePanel
+          :scope="scope"
+          :waypoint="{ selectedId: selectedWaypointId, options: waypointOptions }"
+          :trail="{
             selectedId: selectedTrailId,
             options: trailOptions,
-            followState: trailFollowState
-          } " :collection=" {
+            followState: trailFollowState,
+          }"
+          :collection="{
             selectedId: selectedCollectionId,
             options: collectionOptions,
-            isEmpty: collectionWaypoints.length === 0
-          } " @update:waypoint-id=" id => selectedWaypointId = id " @update:trail-id=" id => selectedTrailId = id "
-          @update:collection-id=" id => selectedCollectionId = id " @record-new-trail=" recordNewTrail "
-          @toggle-follow=" toggleFollow " />
+            isEmpty: collectionWaypoints.length === 0,
+          }"
+          @update:waypoint-id="(id) => (selectedWaypointId = id)"
+          @update:trail-id="(id) => (selectedTrailId = id)"
+          @update:collection-id="(id) => (selectedCollectionId = id)"
+          @record-new-trail="recordNewTrail"
+          @toggle-follow="toggleFollow"
+        />
 
         <ion-card>
           <ion-card-content>
             <div class="telemetry">
-              <div v-if="!isWeb" class="telemetry-item telemetry-item--compass" role="region"
-                :aria-labelledby=" compassRegionLabelId ">
+              <div
+                v-if="!isWeb"
+                class="telemetry-item telemetry-item--compass"
+                role="region"
+                :aria-labelledby="compassRegionLabelId"
+              >
                 <div class="label">
-                  <span :id=" compassRegionLabelId " class="telemetry-label">Compass</span>
-                  <ion-button fill="clear" size="small" class="compass-toggle" @click=" toggleCompassMode ">
+                  <span :id="compassRegionLabelId" class="telemetry-label">Compass</span>
+                  <ion-button
+                    fill="clear"
+                    size="small"
+                    class="compass-toggle"
+                    @click="toggleCompassMode"
+                  >
                     {{ compassModeLabel }}
                   </ion-button>
-                  <ion-button fill="clear" size="small" class="alignment-button" @click=" openAlignment ">
+                  <ion-button
+                    fill="clear"
+                    size="small"
+                    class="alignment-button"
+                    @click="openAlignment"
+                  >
                     Align bearing
                   </ion-button>
-                  <span v-if="alignmentLastBearingLabel" class="alignment-badge">{{ alignmentLastBearingLabel }}</span>
+                  <span v-if="alignmentLastBearingLabel" class="alignment-badge">{{
+                    alignmentLastBearingLabel
+                  }}</span>
                 </div>
                 <div class="value">{{ compassHeadingText }}</div>
               </div>
@@ -63,24 +86,33 @@
           </ion-card-content>
         </ion-card>
 
-        <PositionReadout :lat=" gps?.lat ?? null " :lon=" gps?.lon ?? null " :elev_m=" gps?.altitude ?? null "
-          :accuracy=" gps?.accuracy ?? null " :units=" prefs.units " />
+        <PositionReadout
+          :lat="gps?.lat ?? null"
+          :lon="gps?.lon ?? null"
+          :elev_m="gps?.altitude ?? null"
+          :accuracy="gps?.accuracy ?? null"
+          :units="prefs.units"
+        />
 
         <div class="controls">
-          <ion-button @click=" recenter ">Recenter/Calibrate</ion-button>
+          <ion-button @click="recenter">Recenter/Calibrate</ion-button>
         </div>
 
         <div class="sr-only" aria-live="polite">{{ combinedAnnouncement }}</div>
       </div>
 
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button @click=" markWaypoint " aria-label="Mark waypoint">+</ion-fab-button>
+        <ion-fab-button @click="markWaypoint" aria-label="Mark waypoint">+</ion-fab-button>
       </ion-fab>
     </ion-content>
 
-    <ion-alert :is-open=" permissionAlert.isOpen " :header=" permissionAlert.header "
-      :message=" permissionAlert.message " :buttons=" permissionAlertButtons "
-      @didDismiss=" permissionAlert.dismiss " />
+    <ion-alert
+      :is-open="permissionAlert.isOpen"
+      :header="permissionAlert.header"
+      :message="permissionAlert.message"
+      :buttons="permissionAlertButtons"
+      @didDismiss="permissionAlert.dismiss"
+    />
 
     <AlignmentModal
       ref="alignmentModalRef"
@@ -103,8 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import
-{
+import {
   IonPage,
   IonHeader,
   IonToolbar,
@@ -159,74 +190,105 @@ const permissionAlertButtons = [
   {
     text: 'Not now',
     role: 'cancel',
-    handler: () => { permissionAlert.dismiss(); }
+    handler: () => {
+      permissionAlert.dismiss();
+    },
   },
   {
     text: 'Open Settings',
-    handler: () => permissionAlert.openSettings()
-  }
+    handler: () => permissionAlert.openSettings(),
+  },
 ] as const;
 
-async function ensureLocationPermission (): Promise<boolean>
-{
+async function ensureLocationPermission(): Promise<boolean> {
   return await ensureLocationGranted({
     alert: permissionAlert,
     message: {
       header: 'Location Permission Required',
-      message: 'Enable location access in system settings to unlock GPS tracking and compass guidance.'
-    }
+      message:
+        'Enable location access in system settings to unlock GPS tracking and compass guidance.',
+    },
   });
 }
 
 type AlignmentInputEvent = CustomEvent<{ value?: string | null }>;
 
-const { scope, selectedWaypointId, selectedTrailId, selectedCollectionId, alignmentActive, alignmentBearingDeg, alignmentLastBearingDeg } =
-  storeToRefs(gpsUi);
+const {
+  scope,
+  selectedWaypointId,
+  selectedTrailId,
+  selectedCollectionId,
+  alignmentActive,
+  alignmentBearingDeg,
+  alignmentLastBearingDeg,
+} = storeToRefs(gpsUi);
 
 gpsUi.hydrateFromRoute(route);
 
 const waypointsAll = computed(() => waypointsStore.all);
-const waypointOptions = computed(() =>
-{
+const waypointOptions = computed(() => {
   return waypointsAll.value.map((w) => ({ id: Number(w.id), name: w.name }));
 });
-const waypointItems = computed(() => waypointsAll.value.map((w) => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon })));
+const waypointItems = computed(() =>
+  waypointsAll.value.map((w) => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon }))
+);
 
-const trailOptions = computed(() => trails.list.map(t => ({ id: Number(t.id), name: t.name })));
-const trailWaypoints = computed(() =>
-{
+const trailOptions = computed(() => trails.list.map((t) => ({ id: Number(t.id), name: t.name })));
+const trailWaypoints = computed(() => {
   const id = selectedTrailId.value;
-  if (!id) return [] as { id: number; name: string; lat: number; lon: number }[];
+  if (!id) {
+    return [] as { id: number; name: string; lat: number; lon: number }[];
+  }
   const cached = waypointsStore.byTrail[id] ?? [];
-  return cached.map(w => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon }));
+  return cached.map((w) => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon }));
 });
 
 const collectionsList = computed(() => collections.list);
-const collectionOptions = computed(() => collectionsList.value.map(c => ({ id: Number(c.id), name: c.name })));
-const collectionWaypoints = computed(() =>
-{
+const collectionOptions = computed(() =>
+  collectionsList.value.map((c) => ({ id: Number(c.id), name: c.name }))
+);
+const collectionWaypoints = computed(() => {
   const id = selectedCollectionId.value;
-  if (id == null) return [] as { id: number; name: string; lat: number; lon: number }[];
+  if (id == null) {
+    return [] as { id: number; name: string; lat: number; lon: number }[];
+  }
   const contents = collections.contents[id];
-  if (!contents) return [];
-  return contents.waypoints.map(w => ({ id: Number(w.id), name: w.name, lat: w.lat, lon: w.lon }));
+  if (!contents) {
+    return [];
+  }
+  return contents.waypoints.map((w) => ({
+    id: Number(w.id),
+    name: w.name,
+    lat: w.lat,
+    lon: w.lon,
+  }));
 });
 
 const loc = useLocation();
-const gps = computed(() => loc.current ? {
-  lat: loc.current.lat,
-  lon: loc.current.lon,
-  accuracy: loc.current.accuracy,
-  altitude: loc.current.altitude ?? null,
-  heading: loc.current.heading ?? null,
-  speed: loc.current.speed ?? null,
-  ts: (loc.current as any).timestamp ?? null,
-} : null);
+const gps = computed(() =>
+  loc.current
+    ? {
+        lat: loc.current.lat,
+        lon: loc.current.lon,
+        accuracy: loc.current.accuracy,
+        altitude: loc.current.altitude ?? null,
+        heading: loc.current.heading ?? null,
+        speed: loc.current.speed ?? null,
+        ts: (loc.current as any).timestamp ?? null,
+      }
+    : null
+);
 
 const gpsLatLng = computed(() => (gps.value ? toLatLng(gps.value.lat, gps.value.lon) : null));
 
-const { active, currentIndex, next, start: startFollow, stop: stopFollow, announcement } =
-  useFollowTrail(trailWaypoints, gpsLatLng);
+const {
+  active,
+  currentIndex,
+  next,
+  start: startFollow,
+  stop: stopFollow,
+  announcement,
+} = useFollowTrail(trailWaypoints, gpsLatLng);
 
 const { targetCoord, targetName } = useTarget({
   scope,
@@ -243,7 +305,11 @@ const trailFollowState = computed(() => ({
   nextName: next.value?.name ?? targetName.value,
 }));
 
-const { trueNorthBearingDeg: targetBearingDeg, userBearingText, distanceM } = useBearingDistance({
+const {
+  trueNorthBearingDeg: targetBearingDeg,
+  userBearingText,
+  distanceM,
+} = useBearingDistance({
   gps,
   target: targetCoord,
   units: computed(() => prefs.units),
@@ -251,17 +317,21 @@ const { trueNorthBearingDeg: targetBearingDeg, userBearingText, distanceM } = us
 });
 
 const bearingDisplay = computed(() => userBearingText.value);
-const bearingLabel = computed(() => targetName.value ? `Bearing to ${ targetName.value }` : 'Bearing');
+const bearingLabel = computed(() =>
+  targetName.value ? `Bearing to ${targetName.value}` : 'Bearing'
+);
 
-const distanceDisplay = computed(() =>
-{
-  if (distanceM.value == null) return '—';
-  if (prefs.units === 'imperial')
-  {
-    const feet = distanceM.value * 3.28084;
-    return feet >= 528 ? `${ (feet / 5280).toFixed(2) } mi` : `${ feet.toFixed(0) } ft`;
+const distanceDisplay = computed(() => {
+  if (distanceM.value == null) {
+    return '—';
   }
-  return distanceM.value >= 1000 ? `${ (distanceM.value / 1000).toFixed(2) } km` : `${ distanceM.value.toFixed(0) } m`;
+  if (prefs.units === 'imperial') {
+    const feet = distanceM.value * 3.28084;
+    return feet >= 528 ? `${(feet / 5280).toFixed(2)} mi` : `${feet.toFixed(0)} ft`;
+  }
+  return distanceM.value >= 1000
+    ? `${(distanceM.value / 1000).toFixed(2)} km`
+    : `${distanceM.value.toFixed(0)} m`;
 });
 
 const isWeb = Capacitor.getPlatform() === 'web';
@@ -277,153 +347,159 @@ const adjustInterval = ref<number | null>(null);
 const { differenceAbs, differenceSign } = useBearingAlignment();
 
 /** Display text for the active or last bearing in the modal header. */
-const alignmentBearingText = computed(() =>
-{
+const alignmentBearingText = computed(() => {
   const current = alignmentBearingDeg.value ?? alignmentLastBearingDeg.value;
-  return current == null ? 'Target —' : `Target ${ formatBearing(current) }`;
+  return current == null ? 'Target —' : `Target ${formatBearing(current)}`;
 });
 
 /** Spoken guidance string describing relative alignment progress. */
-const alignmentStatusText = computed(() =>
-{
-  if (!alignmentActive.value) return '';
+const alignmentStatusText = computed(() => {
+  if (!alignmentActive.value) {
+    return '';
+  }
   const diff = differenceAbs.value;
-  if (diff == null) return 'Waiting for compass…';
-  if (diff <= 3) return 'Aligned within 3° of target.';
+  if (diff == null) {
+    return 'Waiting for compass…';
+  }
+  if (diff <= 3) {
+    return 'Aligned within 3° of target.';
+  }
   const direction = differenceSign.value > 0 ? 'right' : 'left';
-  return `${ diff.toFixed(0) }° ${ direction } of target.`;
+  return `${diff.toFixed(0)}° ${direction} of target.`;
 });
 
 /** Badge string surfaced beside the compass toggle when alignment history exists. */
-const alignmentLastBearingLabel = computed(() =>
-{
-  if (alignmentLastBearingDeg.value == null) return '';
-  return `Last ${ formatBearing(alignmentLastBearingDeg.value) }`;
+const alignmentLastBearingLabel = computed(() => {
+  if (alignmentLastBearingDeg.value == null) {
+    return '';
+  }
+  return `Last ${formatBearing(alignmentLastBearingDeg.value)}`;
 });
 
 /** Merge follow-trail and modal announcements into a single polite live region. */
-const combinedAnnouncement = computed(() =>
-{
+const combinedAnnouncement = computed(() => {
   return [announcement.value, alignmentAnnouncement.value].filter(Boolean).join(' ');
 });
 
 /** Format a numeric bearing as a zero-padded degrees string. */
-function formatBearing (value: number): string
-{
-  return `${ Math.round(value).toString().padStart(3, '0') }°`;
+function formatBearing(value: number): string {
+  return `${Math.round(value).toString().padStart(3, '0')}°`;
 }
 
 /** Normalize arbitrary angles to [0, 360) or null. */
-function normalizeBearing (value: number | null | undefined): number | null
-{
-  if (value == null || !Number.isFinite(value)) return null;
+function normalizeBearing(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) {
+    return null;
+  }
   const mod = ((value % 360) + 360) % 360;
   return Number.isFinite(mod) ? mod : null;
 }
 
 /** Keep the editable field in sync with the store state. */
-function updateFieldFromStore (value: number | null)
-{
+function updateFieldFromStore(value: number | null) {
   alignmentBearingField.value = value == null ? '' : String(Math.round(value));
 }
 
 /** Surface a screen-reader announcement for the current bearing delta. */
-function announceBearingUpdate (target: number | null)
-{
-  if (target == null) return;
-  const diff = differenceAbs.value;
-  if (diff == null)
-  {
-    alignmentAnnouncement.value = `Bearing set to ${ formatBearing(target) }. Compass signal unavailable.`;
+function announceBearingUpdate(target: number | null) {
+  if (target == null) {
     return;
   }
-  if (diff <= 3)
-  {
-    alignmentAnnouncement.value = `Bearing set to ${ formatBearing(target) }. Aligned within 3 degrees.`;
+  const diff = differenceAbs.value;
+  if (diff == null) {
+    alignmentAnnouncement.value = `Bearing set to ${formatBearing(target)}. Compass signal unavailable.`;
+    return;
+  }
+  if (diff <= 3) {
+    alignmentAnnouncement.value = `Bearing set to ${formatBearing(target)}. Aligned within 3 degrees.`;
     return;
   }
   const direction = differenceSign.value > 0 ? 'right' : 'left';
-  alignmentAnnouncement.value = `Bearing set to ${ formatBearing(target) }, ${ diff.toFixed(0) } degrees ${ direction } of target.`;
+  alignmentAnnouncement.value = `Bearing set to ${formatBearing(target)}, ${diff.toFixed(0)} degrees ${direction} of target.`;
 }
 
 /** Open the alignment modal, seeding with the latest compass or stored bearing. */
-function openAlignment ()
-{
-  if (isWeb) return;
-  if (alignmentActive.value) return;
+function openAlignment() {
+  if (isWeb) {
+    return;
+  }
+  if (alignmentActive.value) {
+    return;
+  }
   const seed = compass.headingDeg.value ?? alignmentLastBearingDeg.value ?? 0;
   gpsUi.beginAlignment(seed);
   updateFieldFromStore(alignmentBearingDeg.value);
-  alignmentAnnouncement.value = `Alignment guidance on. Target ${ formatBearing((alignmentBearingDeg.value ?? seed) ?? 0) }.`;
-  void nextTick(() => { alignmentModalRef.value?.focusInput?.(); });
+  alignmentAnnouncement.value = `Alignment guidance on. Target ${formatBearing(alignmentBearingDeg.value ?? seed ?? 0)}.`;
+  void nextTick(() => {
+    alignmentModalRef.value?.focusInput?.();
+  });
 }
 
 /** Close the modal and tear down timers/subscriptions. */
-function closeAlignment ()
-{
-  if (!alignmentActive.value) return;
+function closeAlignment() {
+  if (!alignmentActive.value) {
+    return;
+  }
   stopAdjust();
   gpsUi.endAlignment();
   alignmentAnnouncement.value = 'Alignment guidance off.';
 }
 
 /** Apply an incremental delta to the current bearing. */
-function adjustBearing (delta: number)
-{
+function adjustBearing(delta: number) {
   const current = alignmentBearingDeg.value ?? alignmentLastBearingDeg.value ?? 0;
   const next = normalizeBearing(current + delta);
-  if (next == null) return;
+  if (next == null) {
+    return;
+  }
   gpsUi.setAlignmentBearing(next);
   updateFieldFromStore(next);
   announceBearingUpdate(next);
 }
 
 /** Begin a press-to-repeat adjustment, accelerating after a short hold. */
-function startAdjust (direction: -1 | 1)
-{
+function startAdjust(direction: -1 | 1) {
   adjustBearing(direction);
-  if (adjustTimeout.value != null) window.clearTimeout(adjustTimeout.value);
-  adjustTimeout.value = window.setTimeout(() =>
-  {
-    if (adjustInterval.value != null) window.clearInterval(adjustInterval.value);
-    adjustInterval.value = window.setInterval(() =>
-    {
+  if (adjustTimeout.value != null) {
+    window.clearTimeout(adjustTimeout.value);
+  }
+  adjustTimeout.value = window.setTimeout(() => {
+    if (adjustInterval.value != null) {
+      window.clearInterval(adjustInterval.value);
+    }
+    adjustInterval.value = window.setInterval(() => {
       adjustBearing(direction * 5);
     }, 180);
   }, 500);
 }
 
 /** Cancel any pending timer/interval for the step adjustments. */
-function stopAdjust ()
-{
-  if (adjustTimeout.value != null)
-  {
+function stopAdjust() {
+  if (adjustTimeout.value != null) {
     window.clearTimeout(adjustTimeout.value);
     adjustTimeout.value = null;
   }
-  if (adjustInterval.value != null)
-  {
+  if (adjustInterval.value != null) {
     window.clearInterval(adjustInterval.value);
     adjustInterval.value = null;
   }
 }
 
 /** Re-seed alignment using the live compass heading. */
-function resetAlignmentToCurrent ()
-{
+function resetAlignmentToCurrent() {
   const heading = compass.headingDeg.value;
-  if (heading == null) return;
+  if (heading == null) {
+    return;
+  }
   gpsUi.setAlignmentBearing(heading);
   updateFieldFromStore(heading);
   announceBearingUpdate(heading);
 }
 
 /** Align to the GPS-derived waypoint bearing for straight-line guidance. */
-function setAlignmentToWaypointBearing ()
-{
+function setAlignmentToWaypointBearing() {
   const bearing = targetBearingDeg.value;
-  if (bearing == null)
-  {
+  if (bearing == null) {
     alignmentAnnouncement.value = 'Waypoint bearing unavailable.';
     return;
   }
@@ -433,99 +509,94 @@ function setAlignmentToWaypointBearing ()
 }
 
 /** Track raw input changes before validation. */
-function onAlignmentInput (event: AlignmentInputEvent)
-{
+function onAlignmentInput(event: AlignmentInputEvent) {
   const raw = event?.detail?.value;
   alignmentBearingField.value = raw == null ? '' : String(raw);
 }
 
 /** Commit the numeric field, normalizing angles and announcing results. */
-function commitAlignmentField (event?: AlignmentInputEvent)
-{
+function commitAlignmentField(event?: AlignmentInputEvent) {
   const raw = event?.detail?.value ?? alignmentBearingField.value;
   const parsed = Number.parseFloat(String(raw));
-  if (!Number.isFinite(parsed))
-  {
+  if (!Number.isFinite(parsed)) {
     updateFieldFromStore(alignmentBearingDeg.value ?? alignmentLastBearingDeg.value);
     return;
   }
   const normalized = normalizeBearing(parsed);
-  if (normalized == null) return;
+  if (normalized == null) {
+    return;
+  }
   gpsUi.setAlignmentBearing(normalized);
   updateFieldFromStore(normalized);
   announceBearingUpdate(normalized);
 }
 
-watch(alignmentActive, (active) =>
-{
-  if (active)
-  {
+watch(alignmentActive, (active) => {
+  if (active) {
     updateFieldFromStore(alignmentBearingDeg.value ?? alignmentLastBearingDeg.value);
-    void nextTick(() => { alignmentModalRef.value?.focusInput?.(); });
-  } else
-  {
+    void nextTick(() => {
+      alignmentModalRef.value?.focusInput?.();
+    });
+  } else {
     alignmentBearingField.value = '';
   }
 });
 
-watch(alignmentBearingDeg, (value) =>
-{
-  if (!alignmentActive.value) return;
+watch(alignmentBearingDeg, (value) => {
+  if (!alignmentActive.value) {
+    return;
+  }
   updateFieldFromStore(value);
 });
 
-async function toggleFollow ()
-{
-  if (!selectedTrailId.value) return;
-  if (active.value) stopFollow();
-  else startFollow(0);
+async function toggleFollow() {
+  if (!selectedTrailId.value) {
+    return;
+  }
+  if (active.value) {
+    stopFollow();
+  } else {
+    startFollow(0);
+  }
 }
 
-async function recenter ()
-{
-  try
-  {
+async function recenter() {
+  try {
     const sample = await locationStream.getCurrentSnapshot({ timeoutMs: 5000 });
     loc.current = sample;
-  } catch (e)
-  {
+  } catch (e) {
     console.warn('[GpsPage] recenter failed', e);
-    if ((e as any)?.code === 1)
-    {
+    if ((e as any)?.code === 1) {
       permissionAlert.show({
         header: 'Location Permission Required',
-        message: 'Location access appears to be disabled. Open settings to re-enable GPS tracking.'
+        message: 'Location access appears to be disabled. Open settings to re-enable GPS tracking.',
       });
-    } else
-    {
+    } else {
       permissionAlert.show({
         header: 'Location Unavailable',
-        message: 'Unable to retrieve a GPS fix. Ensure location services are enabled and try again.'
+        message:
+          'Unable to retrieve a GPS fix. Ensure location services are enabled and try again.',
       });
       return;
     }
   }
 }
 
-async function recordNewTrail ()
-{
+async function recordNewTrail() {
   const ts = new Date();
-  const name = `Trail ${ ts.toLocaleDateString() } ${ ts.toLocaleTimeString() }`;
+  const name = `Trail ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`;
   const id = await trails.create({ name, description: null });
   selectedTrailId.value = id;
   actions.show('New trail ready. Tap + to record waypoints.', { kind: 'success' });
 }
 
-async function toggleCompassMode ()
-{
+async function toggleCompassMode() {
   const nextMode = await compass.toggleMode();
   await prefs.setCompassMode(nextMode);
 }
 
-async function markWaypoint ()
-{
-  if (!gps.value)
-  {
+async function markWaypoint() {
+  if (!gps.value) {
     actions.show('No GPS fix yet. Tap Recenter and allow location access.', {
       kind: 'warning',
       placement: 'banner-top',
@@ -534,25 +605,21 @@ async function markWaypoint ()
     return;
   }
   const point = {
-    name: `WP ${ new Date().toLocaleTimeString() }`,
+    name: `WP ${new Date().toLocaleTimeString()}`,
     lat: gps.value.lat,
     lon: gps.value.lon,
     elev_m: null,
   };
-  try
-  {
+  try {
     const wpa = useWaypointActions();
-    if (scope.value === 'trail' && selectedTrailId.value)
-    {
+    if (scope.value === 'trail' && selectedTrailId.value) {
       await wpa.addToTrail(selectedTrailId.value, point);
-    } else
-    {
+    } else {
       await wpa.createStandalone(point);
     }
-  } catch (err: any)
-  {
+  } catch (err: any) {
     console.error('Mark waypoint failed', err);
-    actions.show(`Failed to save waypoint: ${ err?.message ?? String(err) }`, {
+    actions.show(`Failed to save waypoint: ${err?.message ?? String(err)}`, {
       kind: 'error',
       placement: 'banner-top',
       durationMs: null,
@@ -560,56 +627,76 @@ async function markWaypoint ()
   }
 }
 
-onMounted(async () =>
-{
-  console.log("[gpsPage] onMounted");
+onMounted(async () => {
+  console.log('[gpsPage] onMounted');
   await Promise.all([trails.refresh(), waypointsStore.refreshAll(), collections.refresh()]);
-  try
-  {
+  try {
     const ok = await ensureLocationPermission();
-    if (ok)
-    {
+    if (ok) {
       console.log("[gps page] It's okay to start location");
       await loc.start();
-      console.log("[gps page]: Recenter call occuring");
+      console.log('[gps page]: Recenter call occuring');
       await recenter();
     }
-  } catch (e)
-  {
+  } catch (e) {
     console.warn('[GpsPage] start stream failed', e);
   }
 
-  if (!isWeb)
-  {
-    try
-    {
+  if (!isWeb) {
+    try {
       await compass.start();
-    } catch (e)
-    {
+    } catch (e) {
       console.error('[Heading] init error', e);
     }
   }
 });
 
-onBeforeUnmount(() =>
-{
+onBeforeUnmount(() => {
   stopAdjust();
-  try { void compass.stop(); } catch { }
-  try { loc.detach(); } catch { }
+  try {
+    void compass.stop();
+  } catch {}
+  try {
+    loc.detach();
+  } catch {}
 });
 
-watch(() => prefs.compassMode, (mode) => { void compass.setMode(mode); });
-watch(selectedTrailId, async (id) => { if (id != null) await waypointsStore.loadForTrail(id); }, { immediate: true });
-watch(selectedCollectionId, async (id) =>
-{
-  if (id == null) return;
-  if (!collections.contents[id]) await collections.loadContents(id);
-}, { immediate: true });
-watch(() => gps.value, async (pos) =>
-{
-  if (!pos || isWeb) return;
-  await compass.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
-});
+watch(
+  () => prefs.compassMode,
+  (mode) => {
+    void compass.setMode(mode);
+  }
+);
+watch(
+  selectedTrailId,
+  async (id) => {
+    if (id != null) {
+      await waypointsStore.loadForTrail(id);
+    }
+  },
+  { immediate: true }
+);
+watch(
+  selectedCollectionId,
+  async (id) => {
+    if (id == null) {
+      return;
+    }
+    if (!collections.contents[id]) {
+      await collections.loadContents(id);
+    }
+  },
+  { immediate: true }
+);
+watch(
+  () => gps.value,
+  async (pos) => {
+    if (!pos || isWeb) {
+      return;
+    }
+    await compass.setLocation({ lat: pos.lat, lon: pos.lon, alt: pos.altitude ?? undefined });
+  }
+);
 </script>
 
 <style scoped>
@@ -686,5 +773,4 @@ watch(() => gps.value, async (pos) =>
   font-size: 0.85rem;
   color: var(--ion-color-medium);
 }
-
 </style>

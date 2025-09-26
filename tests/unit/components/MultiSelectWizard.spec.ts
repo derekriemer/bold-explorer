@@ -6,7 +6,7 @@ import type { MultiSelectConfig, MultiSelectItem } from '@/types/multi-select';
 function ionStubs() {
   const pass = (name: string, tag = 'div', cls?: string) => ({
     name,
-    template: `<${tag} ${cls ? `class=\"${cls}\"` : ''}><slot></slot></${tag}>`
+    template: `<${tag} ${cls ? `class=\"${cls}\"` : ''}><slot></slot></${tag}>`,
   });
   return {
     IonModal: pass('IonModal'),
@@ -21,9 +21,12 @@ function ionStubs() {
     // Simple button that emits click
     IonButton: { template: `<button @click="$emit('click', $event)"><slot></slot></button>` },
     // Minimal checkbox stub (we won't rely on DOM toggling, but keep disabled attribute visible)
-    IonCheckbox: { props: ['disabled', 'checked'], template: `<input type="checkbox" :disabled="disabled" :checked="checked" />` },
+    IonCheckbox: {
+      props: ['disabled', 'checked'],
+      template: `<input type="checkbox" :disabled="disabled" :checked="checked" />`,
+    },
     // Searchbar placeholder
-    IonSearchbar: { template: `<div><slot></slot></div>` }
+    IonSearchbar: { template: `<div><slot></slot></div>` },
   } as any;
 }
 
@@ -32,11 +35,11 @@ async function mountWizard(items: MultiSelectItem[], commitMock = vi.fn()) {
     title: 'Add Things',
     getItems: async () => items,
     commit: commitMock,
-    ctaLabel: 'Add Selected'
+    ctaLabel: 'Add Selected',
   };
   const wrapper = mount(MultiSelectWizard, {
     props: { open: true, config },
-    global: { stubs: ionStubs() }
+    global: { stubs: ionStubs() },
   });
   // Wait for initial load
   await Promise.resolve();
@@ -48,7 +51,7 @@ describe('MultiSelectWizard', () => {
   const sample: MultiSelectItem[] = [
     { id: 1, label: 'Alpha', sublabel: 'A desc' },
     { id: 2, label: 'Beta', sublabel: 'B desc' },
-    { id: 3, label: 'Gamma', sublabel: 'G desc', disabled: true }
+    { id: 3, label: 'Gamma', sublabel: 'G desc', disabled: true },
   ];
 
   it('loads and displays items and sublabels', async () => {
@@ -90,8 +93,8 @@ describe('MultiSelectWizard', () => {
     const commitSpy = vi.fn();
     const { wrapper } = await mountWizard(sample, commitSpy);
     const btns = wrapper.findAll('button');
-    const selectAll = btns.find(b => b.text() === 'Select All');
-    const clear = btns.find(b => b.text() === 'Clear');
+    const selectAll = btns.find((b) => b.text() === 'Select All');
+    const clear = btns.find((b) => b.text() === 'Clear');
     expect(selectAll && clear).toBeTruthy();
     await selectAll!.trigger('click');
     await (wrapper.vm as any).onCommit();

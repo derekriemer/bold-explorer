@@ -13,4 +13,3 @@ describe.skipIf(!webDbAvailable())('DB Setup (web jeep-sqlite)', () => {
     expect(end - start).toBeGreaterThanOrEqual(0);
   });
 });
-

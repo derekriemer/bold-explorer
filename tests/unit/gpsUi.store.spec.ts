@@ -54,4 +54,3 @@ describe('useGpsUiStore - alignment lifecycle', () => {
     expect(store.alignmentLastBearingDeg).toBeNull();
   });
 });
-

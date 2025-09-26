@@ -45,10 +45,8 @@ const props = defineProps<{
   };
 }>();
 
-const componentForScope = computed(() =>
-{
-  switch (props.scope)
-  {
+const componentForScope = computed(() => {
+  switch (props.scope) {
     case 'trail':
       return GpsTrailPanel;
     case 'collection':
@@ -59,18 +57,15 @@ const componentForScope = computed(() =>
   }
 });
 
-const panelProps = computed(() =>
-{
-  if (props.scope === 'trail')
-  {
+const panelProps = computed(() => {
+  if (props.scope === 'trail') {
     return {
       selectedId: props.trail.selectedId,
       trails: props.trail.options,
       followState: props.trail.followState,
     };
   }
-  if (props.scope === 'collection')
-  {
+  if (props.scope === 'collection') {
     return {
       selectedId: props.collection.selectedId,
       collections: props.collection.options,
@@ -83,20 +78,21 @@ const panelProps = computed(() =>
   };
 });
 
-function handleUpdate(id: number | null)
-{
-  if (props.scope === 'trail') emit('update:trailId', id);
-  else if (props.scope === 'collection') emit('update:collectionId', id);
-  else emit('update:waypointId', id);
+function handleUpdate(id: number | null) {
+  if (props.scope === 'trail') {
+    emit('update:trailId', id);
+  } else if (props.scope === 'collection') {
+    emit('update:collectionId', id);
+  } else {
+    emit('update:waypointId', id);
+  }
 }
 
-function emitRecordTrail()
-{
+function emitRecordTrail() {
   emit('recordNewTrail');
 }
 
-function emitToggleFollow()
-{
+function emitToggleFollow() {
   emit('toggleFollow');
 }
 </script>

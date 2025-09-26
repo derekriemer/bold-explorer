@@ -12,67 +12,54 @@ const DEFAULT_HEADER = 'Enable Permissions';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
-async function openBackgroundSettings (): Promise<boolean>
-{
-  try
-  {
-    if (!Capacitor.isNativePlatform()) return false;
-    if (!Capacitor.isPluginAvailable('BackgroundGeolocation')) return false;
+async function openBackgroundSettings(): Promise<boolean> {
+  try {
+    if (!Capacitor.isNativePlatform()) {
+      return false;
+    }
+    if (!Capacitor.isPluginAvailable('BackgroundGeolocation')) {
+      return false;
+    }
     await BackgroundGeolocation.openSettings();
     return true;
-  }
-  catch (err)
-  {
+  } catch (err) {
     console.warn('[usePermissionAlert] background plugin openSettings failed', err);
     return true; // treat as handled to avoid double dialogs
   }
 }
 
-export function usePermissionAlert(initial: PermissionAlertOptions | null = null)
-{
+export function usePermissionAlert(initial: PermissionAlertOptions | null = null) {
   const isOpen = ref(false);
   const header = ref(initial?.header ?? DEFAULT_HEADER);
   const message = ref(initial?.message ?? '');
 
-  function show (opts: PermissionAlertOptions): void
-  {
+  function show(opts: PermissionAlertOptions): void {
     header.value = opts.header ?? DEFAULT_HEADER;
     message.value = opts.message;
     isOpen.value = true;
   }
 
-  function dismiss (): void
-  {
+  function dismiss(): void {
     isOpen.value = false;
   }
 
-  async function openSettings (): Promise<void>
-  {
-    try
-    {
+  async function openSettings(): Promise<void> {
+    try {
       const handled = await openBackgroundSettings();
       const appOpenSettings = (App as any)?.openSettings;
-      if (!handled && typeof appOpenSettings === 'function')
-      {
+      if (!handled && typeof appOpenSettings === 'function') {
         await appOpenSettings();
-      }
-      else if (!handled)
-      {
+      } else if (!handled) {
         console.warn('[usePermissionAlert] App.openSettings is unavailable on this platform');
       }
-    }
-    catch (err)
-    {
+    } catch (err) {
       console.warn('[usePermissionAlert] openSettings failed', err);
-    }
-    finally
-    {
+    } finally {
       dismiss();
     }
   }
 
-  if (initial?.message)
-  {
+  if (initial?.message) {
     show(initial);
   }
 
@@ -82,7 +69,7 @@ export function usePermissionAlert(initial: PermissionAlertOptions | null = null
     message,
     show,
     dismiss,
-    openSettings
+    openSettings,
   };
 }
 

@@ -23,11 +23,15 @@ export function defineDbLifecycle() {
     db = await createInMemoryDb();
   });
   afterEach(async () => {
-    if (db) await db.destroy();
+    if (db) {
+      await db.destroy();
+    }
     db = null;
   });
   return () => {
-    if (!db) throw new Error('Test DB not initialized yet');
+    if (!db) {
+      throw new Error('Test DB not initialized yet');
+    }
     return db;
   };
 }

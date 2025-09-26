@@ -26,8 +26,7 @@ type AutoStartOptions = StartOptions & {
   onDenied?: () => void;
 };
 
-function toFix (sample: LocationSample): Fix
-{
+function toFix(sample: LocationSample): Fix {
   return {
     lat: sample.lat,
     lon: sample.lon,
@@ -39,35 +38,42 @@ function toFix (sample: LocationSample): Fix
   };
 }
 
-function mapPositionOptionsToProvider (opts?: PositionOptions): Partial<ProviderOptions>
-{
-  if (!opts) return {};
+function mapPositionOptionsToProvider(opts?: PositionOptions): Partial<ProviderOptions> {
+  if (!opts) {
+    return {};
+  }
   const provider: Partial<ProviderOptions> = {};
-  if (opts.timeout != null) provider.timeoutMs = opts.timeout;
-  if (opts.maximumAge != null) provider.maximumAgeMs = opts.maximumAge;
+  if (opts.timeout != null) {
+    provider.timeoutMs = opts.timeout;
+  }
+  if (opts.maximumAge != null) {
+    provider.maximumAgeMs = opts.maximumAge;
+  }
   return provider;
 }
 
-function mapToWatchOptions (opts?: StartOptions): Partial<WatchOptions>
-{
-  if (!opts) return {};
+function mapToWatchOptions(opts?: StartOptions): Partial<WatchOptions> {
+  if (!opts) {
+    return {};
+  }
   const watch: Partial<WatchOptions> = {};
-  if (opts.minAccuracyM != null) watch.minAccuracyM = opts.minAccuracyM;
-  if (opts.settleMs != null) watch.settleMs = opts.settleMs;
+  if (opts.minAccuracyM != null) {
+    watch.minAccuracyM = opts.minAccuracyM;
+  }
+  if (opts.settleMs != null) {
+    watch.settleMs = opts.settleMs;
+  }
   return watch;
 }
 
-export function useGeolocation ()
-{
+export function useGeolocation() {
   const current = ref<Fix | null>(null);
   const best = ref<Fix | null>(null);
   const watching = ref(false);
   let sub: Subscription | null = null;
 
-  const updateBest = (sample: Fix) =>
-  {
-    if (!best.value)
-    {
+  const updateBest = (sample: Fix) => {
+    if (!best.value) {
       best.value = sample;
       return;
     }
@@ -75,45 +81,42 @@ export function useGeolocation ()
     const newAcc = sample.accuracy;
     const bestAcc = best.value.accuracy;
 
-    if (newAcc == null)
-    {
-      if (bestAcc == null) best.value = sample;
+    if (newAcc == null) {
+      if (bestAcc == null) {
+        best.value = sample;
+      }
       return;
     }
 
-    if (bestAcc == null || newAcc < bestAcc)
-    {
+    if (bestAcc == null || newAcc < bestAcc) {
       best.value = sample;
     }
   };
 
-  async function start (opts?: StartOptions): Promise<boolean>
-  {
-    if (watching.value) return true;
+  async function start(opts?: StartOptions): Promise<boolean> {
+    if (watching.value) {
+      return true;
+    }
 
     best.value = null;
 
     const watchOpts = mapToWatchOptions(opts);
-    if (Object.keys(watchOpts).length > 0)
-    {
+    if (Object.keys(watchOpts).length > 0) {
       locationStream.configureWatch(watchOpts);
     }
 
     const providerOpts = mapPositionOptionsToProvider(opts?.options);
-    if (Object.keys(providerOpts).length > 0)
-    {
+    if (Object.keys(providerOpts).length > 0) {
       locationStream.configureProvider(providerOpts);
     }
 
     const ok = await locationStream.ensureProviderPermissions();
-    if (!ok)
-    {
+    if (!ok) {
       return false;
     }
 
     await locationStream.start();
-    sub = locationStream.updates.subscribe((sample) =>
-    {
+    sub = locationStream.updates.subscribe((sample) => {
       const fix = toFix(sample);
       current.value = fix;
       updateBest(fix);
@@ -122,21 +125,22 @@ export function useGeolocation ()
     return true;
   }
 
-  async function stop (): Promise<void>
-  {
-    if (!watching.value) return;
-    try { sub?.unsubscribe(); } catch {}
+  async function stop(): Promise<void> {
+    if (!watching.value) {
+      return;
+    }
+    try {
+      sub?.unsubscribe();
+    } catch {}
     sub = null;
     await locationStream.stop();
     watching.value = false;
   }
 
-  async function recenter (options?: PositionOptions): Promise<Fix | null>
-  {
+  async function recenter(options?: PositionOptions): Promise<Fix | null> {
     const providerOpts = mapPositionOptionsToProvider(options);
     const sample = await locationStream.getCurrentSnapshot(providerOpts);
-    if (sample)
-    {
+    if (sample) {
       const fix = toFix(sample);
       current.value = fix;
       updateBest(fix);
@@ -145,32 +149,27 @@ export function useGeolocation ()
     return null;
   }
 
-  async function ensurePermissions (): Promise<boolean>
-  {
+  async function ensurePermissions(): Promise<boolean> {
     return await locationStream.ensureProviderPermissions();
   }
 
-  function autoStartOnMounted (opts?: AutoStartOptions)
-  {
-    onMounted(async () =>
-    {
+  function autoStartOnMounted(opts?: AutoStartOptions) {
+    onMounted(async () => {
       const ok = await start(opts);
-      if (ok)
-      {
-        if (opts?.recenter !== false)
-        {
+      if (ok) {
+        if (opts?.recenter !== false) {
           await recenter(opts?.options);
         }
         opts?.onGranted?.();
-      }
-      else
-      {
+      } else {
         opts?.onDenied?.();
       }
     });
   }
 
-  onBeforeUnmount(() => { void stop(); });
+  onBeforeUnmount(() => {
+    void stop();
+  });
 
   const m2ft = (m?: number) => (m == null ? undefined : m * 3.28084);
 
@@ -183,6 +182,6 @@ export function useGeolocation ()
     recenter,
     ensurePermissions,
     autoStartOnMounted,
-    m2ft
+    m2ft,
   };
 }

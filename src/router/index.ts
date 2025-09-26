@@ -16,8 +16,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/WaypointsPage.vue'),
         // Ensure opening from tab bar centers based on current location when no params provided.
         async beforeEnter(to) {
-          const hasExplicitCenter = !!to.query.center || (to.query.lat != null && to.query.lon != null);
-          if (hasExplicitCenter) return true;
+          const hasExplicitCenter =
+            !!to.query.center || (to.query.lat != null && to.query.lon != null);
+          if (hasExplicitCenter) {
+            return true;
+          }
           try {
             const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
             const lat = pos.coords.latitude;
@@ -27,7 +30,7 @@ const routes: RouteRecordRaw[] = [
                 path: to.path,
                 query: { ...to.query, lat: String(lat), lon: String(lon) },
                 hash: to.hash,
-                replace: true
+                replace: true,
               } as any;
             }
           } catch (e) {
@@ -35,19 +38,19 @@ const routes: RouteRecordRaw[] = [
             console.warn('[router] getCurrentPosition failed', e);
           }
           return true;
-        }
+        },
       },
       { path: 'trails', component: () => import('@/pages/TrailsPage.vue') },
       { path: 'collections', component: () => import('@/pages/CollectionsPage.vue') },
       { path: 'settings', component: () => import('@/pages/SettingsPage.vue') },
-      { path: 'debug', component: () => import('@/pages/DebugPage.vue') }
-    ]
-  }
+      { path: 'debug', component: () => import('@/pages/DebugPage.vue') },
+    ],
+  },
 ];
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes
+  routes,
 });
 
 export default router;

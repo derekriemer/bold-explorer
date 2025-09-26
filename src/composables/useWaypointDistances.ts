@@ -21,13 +21,14 @@ export function useWaypointDistances(opts: UseWaypointDistancesOptions) {
   const distances = ref<Record<number, number>>({});
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  function toSafeLatLng(value: LatLng | { lat: number; lon: number }): LatLng
-  {
+  function toSafeLatLng(value: LatLng | { lat: number; lon: number }): LatLng {
     return isLatLng(value) ? value : toLatLng(value.lat, value.lon);
   }
 
   function compute(center: LatLng | null) {
-    if (!center) return;
+    if (!center) {
+      return;
+    }
     const safeCenter = toSafeLatLng(center);
     const map: Record<number, number> = {};
     for (const w of waypoints.value) {
@@ -37,31 +38,52 @@ export function useWaypointDistances(opts: UseWaypointDistancesOptions) {
   }
 
   function scheduleCompute(center: LatLng | null) {
-    if (!center) return;
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => { compute(center); timer = null; }, Math.max(0, throttleMs));
+    if (!center) {
+      return;
+    }
+    if (timer) {
+      clearTimeout(timer);
+    }
+    timer = setTimeout(
+      () => {
+        compute(center);
+        timer = null;
+      },
+      Math.max(0, throttleMs)
+    );
   }
 
   // Initial compute if a center was provided
-  if (initialCenter) compute(initialCenter);
+  if (initialCenter) {
+    compute(initialCenter);
+  }
 
   // React to GPS updates
   watch(gps, (pos) => {
-    if (!pos) return;
+    if (!pos) {
+      return;
+    }
     scheduleCompute(pos);
   });
 
   // React to waypoint membership changes
   watch(
-    () => waypoints.value.map(w => w.id).join(','),
+    () => waypoints.value.map((w) => w.id).join(','),
     () => {
       // Recompute if we have a current center (gps or initial)
       const center = gps.value ?? initialCenter;
-      if (center) scheduleCompute(center);
+      if (center) {
+        scheduleCompute(center);
+      }
     }
   );
 
-  onBeforeUnmount(() => { if (timer) clearTimeout(timer); timer = null; });
+  onBeforeUnmount(() => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+    timer = null;
+  });
 
   const byDistance = computed(() => {
     const map = distances.value;
@@ -69,8 +91,12 @@ export function useWaypointDistances(opts: UseWaypointDistancesOptions) {
     const list = waypoints.value.map((w) => ({ ...w, distance_m: map[w.id], pinned: p.has(w.id) }));
     // Sort: pinned first, then by distance (undefined distances go last)
     return list.sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
+      if (a.pinned && !b.pinned) {
+        return -1;
+      }
+      if (!a.pinned && b.pinned) {
+        return 1;
+      }
       const da = a.distance_m ?? Number.POSITIVE_INFINITY;
       const db = b.distance_m ?? Number.POSITIVE_INFINITY;
       return da - db;
@@ -79,7 +105,9 @@ export function useWaypointDistances(opts: UseWaypointDistancesOptions) {
 
   const refresh = async () => {
     const center = gps.value ?? initialCenter;
-    if (center) compute(center);
+    if (center) {
+      compute(center);
+    }
   };
 
   return { distances, byDistance, refresh } as const;

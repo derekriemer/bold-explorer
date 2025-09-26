@@ -15,7 +15,9 @@ try {
 }
 
 async function createNativeInMemoryDb(): Promise<Kysely<DB>> {
-  if (!NATIVE_AVAILABLE || !BetterSqlite3) throw new Error('better-sqlite3 not available');
+  if (!NATIVE_AVAILABLE || !BetterSqlite3) {
+    throw new Error('better-sqlite3 not available');
+  }
   const dialect = new SqliteDialect({ database: new BetterSqlite3(':memory:') });
   const db = new Kysely<DB>({ dialect });
   const migrator = createMigrator(db);

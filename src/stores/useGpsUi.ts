@@ -19,27 +19,37 @@ interface GpsUiState {
 }
 
 function coerceScope(value: unknown): GpsUiScope | null {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== 'string') {
+    return null;
+  }
   return SCOPE_VALUES.includes(value as GpsUiScope) ? (value as GpsUiScope) : null;
 }
 
 function coerceId(value: unknown): number | null {
-  if (value == null) return null;
+  if (value == null) {
+    return null;
+  }
   const asNumber = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
   return Number.isFinite(asNumber) ? asNumber : null;
 }
 
-function firstQueryValue(value: LocationQueryValue | LocationQueryValue[] | null | undefined): string | null {
+function firstQueryValue(
+  value: LocationQueryValue | LocationQueryValue[] | null | undefined
+): string | null {
   if (Array.isArray(value)) {
     return value.length > 0 ? firstQueryValue(value[0]) : null;
   }
-  if (value == null) return null;
+  if (value == null) {
+    return null;
+  }
   return value;
 }
 
 /** Normalize an angle to the [0, 360) range or return null if invalid. */
 function normalizeBearing(value: number | null | undefined): number | null {
-  if (value == null || !Number.isFinite(value)) return null;
+  if (value == null || !Number.isFinite(value)) {
+    return null;
+  }
   const mod = ((value % 360) + 360) % 360;
   return Number.isFinite(mod) ? mod : null;
 }
@@ -53,7 +63,7 @@ export const useGpsUiStore = defineStore('gpsUi', {
     alignmentActive: false,
     alignmentBearingDeg: null,
     alignmentLastBearingDeg: null,
-    _hydratedFromRoute: false
+    _hydratedFromRoute: false,
   }),
   actions: {
     setScope(next: GpsUiScope) {
@@ -110,7 +120,9 @@ export const useGpsUiStore = defineStore('gpsUi', {
       this._hydratedFromRoute = false;
     },
     hydrateFromRoute(route: { query: LocationQuery }, opts?: { force?: boolean }) {
-      if (!opts?.force && this._hydratedFromRoute) return;
+      if (!opts?.force && this._hydratedFromRoute) {
+        return;
+      }
 
       const { query } = route;
       const scopeQuery = firstQueryValue(query.scope ?? null);
@@ -139,6 +151,6 @@ export const useGpsUiStore = defineStore('gpsUi', {
       }
 
       this._hydratedFromRoute = true;
-    }
-  }
+    },
+  },
 });

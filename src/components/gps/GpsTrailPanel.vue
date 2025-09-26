@@ -2,16 +2,8 @@
   <div>
     <ion-item>
       <ion-label>Trail</ion-label>
-      <ion-select
-        v-model="internalSelectedId"
-        interface="popover"
-        placeholder="None selected"
-      >
-        <ion-select-option
-          v-for="trail in trails"
-          :key="trail.id"
-          :value="trail.id"
-        >
+      <ion-select v-model="internalSelectedId" interface="popover" placeholder="None selected">
+        <ion-select-option v-for="trail in trails" :key="trail.id" :value="trail.id">
           {{ trail.name }}
         </ion-select-option>
       </ion-select>
@@ -22,7 +14,9 @@
         <div class="cta-row">
           <div>
             <div class="headline">Start a new trail</div>
-            <div class="support">Record waypoints as you move. The + button adds points to this trail.</div>
+            <div class="support">
+              Record waypoints as you move. The + button adds points to this trail.
+            </div>
           </div>
           <ion-button color="primary" @click="$emit('recordNewTrail')">Record New Trail</ion-button>
         </div>

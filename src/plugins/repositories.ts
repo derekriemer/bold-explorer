@@ -26,7 +26,7 @@ export async function installRepositories(pinia: Pinia) {
     trails: markRaw(new TrailsRepo(db)),
     waypoints: markRaw(new WaypointsRepo(db)),
     collections: markRaw(new CollectionsRepo(db)),
-    autoWaypoints: markRaw(new AutoWaypointsRepo(db))
+    autoWaypoints: markRaw(new AutoWaypointsRepo(db)),
   } as Repos);
   pinia.use(() => ({ $repos: repos }));
 }

@@ -2,11 +2,7 @@
   <div>
     <ion-item>
       <ion-label>Collection</ion-label>
-      <ion-select
-        v-model="internalSelectedId"
-        interface="popover"
-        placeholder="None selected"
-      >
+      <ion-select v-model="internalSelectedId" interface="popover" placeholder="None selected">
         <ion-select-option
           v-for="collection in collections"
           :key="collection.id"

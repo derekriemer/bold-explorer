@@ -12,11 +12,13 @@ export const getCompassMode = async (): Promise<'magnetic' | 'true'> => {
   return (value as any) ?? 'magnetic';
 };
 
-export const setCompassMode = (value: 'magnetic' | 'true') => Preferences.set({ key: 'compass_mode', value });
+export const setCompassMode = (value: 'magnetic' | 'true') =>
+  Preferences.set({ key: 'compass_mode', value });
 
 export const getAudioCuesEnabled = async (): Promise<boolean> => {
   const { value } = await Preferences.get({ key: 'audio_cues' });
   return value === 'true';
 };
 
-export const setAudioCuesEnabled = (value: boolean) => Preferences.set({ key: 'audio_cues', value: String(value) });
+export const setAudioCuesEnabled = (value: boolean) =>
+  Preferences.set({ key: 'audio_cues', value: String(value) });

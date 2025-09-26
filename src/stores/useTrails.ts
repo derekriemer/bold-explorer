@@ -20,6 +20,6 @@ export const useTrails = defineStore('trails', {
     async remove(id: number) {
       await this.$repos.trails.remove(id);
       await this.refresh();
-    }
-  }
+    },
+  },
 });

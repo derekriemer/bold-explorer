@@ -38,13 +38,17 @@ function toSample(location: BackgroundLocation): LocationSample {
 function createError(message: string, code: string, cause?: unknown): Error & { code: string } {
   const err = new Error(message) as Error & { code: string };
   err.code = code;
-  if (cause !== undefined) err.cause = cause;
+  if (cause !== undefined) {
+    err.cause = cause;
+  }
   return err;
 }
 
 function isBackgroundPluginAvailable(): boolean {
   const platform = Capacitor.getPlatform();
-  if (platform === 'web') return false;
+  if (platform === 'web') {
+    return false;
+  }
   return true;
 }
 
@@ -52,7 +56,9 @@ async function ensureAndroidNotificationPermission(): Promise<boolean> {
   console.info('[BackgroundGeolocation] ensureAndroidNotificationPermission start', {
     platform: Capacitor.getPlatform(),
   });
-  if (Capacitor.getPlatform() !== 'android') return true;
+  if (Capacitor.getPlatform() !== 'android') {
+    return true;
+  }
   if (
     !Capacitor.isPluginAvailable('LocalNotifications') ||
     typeof LocalNotifications?.checkPermissions !== 'function'
@@ -65,7 +71,9 @@ async function ensureAndroidNotificationPermission(): Promise<boolean> {
   try {
     const status: LocalNotificationPermissionStatus = await LocalNotifications.checkPermissions();
     console.info('[BackgroundGeolocation] notification permission status', status);
-    if (status.display === 'granted') return true;
+    if (status.display === 'granted') {
+      return true;
+    }
     const request: LocalNotificationPermissionStatus =
       await LocalNotifications.requestPermissions();
     console.info('[BackgroundGeolocation] notification permission request outcome', request);
@@ -88,7 +96,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
   }
 
   async ensurePermissions(): Promise<boolean> {
-    if (!BackgroundGeolocationProvider.isSupported()) return false;
+    if (!BackgroundGeolocationProvider.isSupported()) {
+      return false;
+    }
     try {
       const geoStatus: GeolocationPermissionStatus = await Geolocation.checkPermissions();
       let granted = isLocationPermissionGranted(geoStatus);
@@ -96,7 +106,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
         const req = await Geolocation.requestPermissions();
         granted = isLocationPermissionGranted(req);
       }
-      if (!granted) return false;
+      if (!granted) {
+        return false;
+      }
       const notificationsOkay = await ensureAndroidNotificationPermission();
       return notificationsOkay;
     } catch (err) {
@@ -132,7 +144,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
       let watcherId: string | null = null;
 
       const cleanup = async () => {
-        if (timer) clearTimeout(timer);
+        if (timer) {
+          clearTimeout(timer);
+        }
         timer = null;
         if (watcherId) {
           try {
@@ -145,7 +159,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
       };
 
       BackgroundGeolocation.addWatcher(watcherOptions, async (location, error) => {
-        if (resolved) return;
+        if (resolved) {
+          return;
+        }
         if (error) {
           resolved = true;
           await cleanup();
@@ -162,14 +178,18 @@ export class BackgroundGeolocationProvider implements LocationProvider {
         .then((id) => {
           watcherId = id;
           timer = setTimeout(async () => {
-            if (resolved) return;
+            if (resolved) {
+              return;
+            }
             resolved = true;
             await cleanup();
             reject(createError('Timed out acquiring background location fix.', 'TIMEOUT'));
           }, timeout);
         })
         .catch(async (err) => {
-          if (resolved) return;
+          if (resolved) {
+            return;
+          }
           resolved = true;
           console.warn('[BackgroundGeolocation] getCurrent watcher failed', err);
           await cleanup();
@@ -186,7 +206,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
     console.info('[BackgroundGeolocation] start invoked', {
       alreadyWatching: this.watchId != null,
     });
-    if (this.watchId) return;
+    if (this.watchId) {
+      return;
+    }
 
     if (!BackgroundGeolocationProvider.isSupported()) {
       console.warn('[BackgroundGeolocation] start aborted: plugin unsupported');
@@ -230,7 +252,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
           this.handleWatcherError(error, onError);
           return;
         }
-        if (!location) return;
+        if (!location) {
+          return;
+        }
         onSample(toSample(location));
       });
       console.info('[BackgroundGeolocation] watcher started', { watchId: this.watchId });
@@ -267,7 +291,9 @@ export class BackgroundGeolocationProvider implements LocationProvider {
 
   async stop(): Promise<void> {
     console.info('[BackgroundGeolocation] stop invoked', { watchId: this.watchId });
-    if (!this.watchId) return;
+    if (!this.watchId) {
+      return;
+    }
     const id = this.watchId;
     this.watchId = null;
     try {

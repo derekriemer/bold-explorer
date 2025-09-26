@@ -5,4 +5,3 @@ import { ActionServiceKey } from '@/plugins/actions';
 export function useActions(): ActionService {
   return inject(ActionServiceKey, actionsService);
 }
-

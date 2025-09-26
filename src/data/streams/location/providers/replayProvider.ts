@@ -15,8 +15,7 @@ export type ReplayPoint = {
  * - start(): primes and emits the first point; provider remains active.
  * - tick(): emits the next point; returns true if advanced, false if at end.
  */
-export class ReplayProvider implements LocationProvider
-{
+export class ReplayProvider implements LocationProvider {
   private points: ReplayPoint[];
   private idx = 0;
   private active = false;
@@ -24,23 +23,21 @@ export class ReplayProvider implements LocationProvider
   private onError: ((e: unknown) => void) | null = null;
   private clock = Date.now();
 
-  constructor(points: ReplayPoint[])
-  {
+  constructor(points: ReplayPoint[]) {
     this.points = points.slice();
   }
 
-  isActive (): boolean { return this.active; }
+  isActive(): boolean {
+    return this.active;
+  }
 
-  async ensurePermissions (): Promise<boolean>
-  {
+  async ensurePermissions(): Promise<boolean> {
     return true;
   }
 
-  async getCurrent (_opts?: Partial<ProviderOptions>): Promise<LocationSample>
-  {
+  async getCurrent(_opts?: Partial<ProviderOptions>): Promise<LocationSample> {
     const p = this.points[this.idx] ?? this.points[0];
-    if (!p)
-    {
+    if (!p) {
       throw new Error('ReplayProvider has no points to replay');
     }
     const ts = p.timestamp ?? this.clock;
@@ -52,22 +49,20 @@ export class ReplayProvider implements LocationProvider
       heading: p.heading ?? null,
       speed: p.speed ?? null,
       timestamp: ts,
-      provider: 'replay'
+      provider: 'replay',
     };
   }
 
-  async start (
+  async start(
     _opts: Required<ProviderOptions>,
     onSample: (s: LocationSample) => void,
     onError: (e: unknown) => void
-  ): Promise<void>
-  {
+  ): Promise<void> {
     this.onSample = onSample;
     this.onError = onError;
     this.active = true;
     this.idx = 0;
-    if (this.points.length > 0)
-    {
+    if (this.points.length > 0) {
       const p = this.points[0];
       const ts = p.timestamp ?? this.clock;
       this.clock = ts;
@@ -79,26 +74,28 @@ export class ReplayProvider implements LocationProvider
         heading: p.heading ?? null,
         speed: p.speed ?? null,
         timestamp: ts,
-        provider: 'replay'
+        provider: 'replay',
       });
     }
   }
 
-  async stop (): Promise<void>
-  {
+  async stop(): Promise<void> {
     this.active = false;
     this.onSample = null;
     this.onError = null;
   }
 
   /** Advance and emit next point. Returns true if advanced. */
-  tick (): boolean
-  {
-    if (!this.active || !this.onSample) return false;
-    if (this.idx + 1 >= this.points.length) return false;
+  tick(): boolean {
+    if (!this.active || !this.onSample) {
+      return false;
+    }
+    if (this.idx + 1 >= this.points.length) {
+      return false;
+    }
     this.idx += 1;
     const p = this.points[this.idx];
-    const ts = p.timestamp ?? (this.clock + 1000);
+    const ts = p.timestamp ?? this.clock + 1000;
     this.clock = ts;
     this.onSample({
       lat: p.lat,
@@ -108,11 +105,13 @@ export class ReplayProvider implements LocationProvider
       heading: p.heading ?? null,
       speed: p.speed ?? null,
       timestamp: ts,
-      provider: 'replay'
+      provider: 'replay',
     });
     return true;
   }
 
   /** Reset to the first point (does not emit). */
-  reset () { this.idx = 0; }
+  reset() {
+    this.idx = 0;
+  }
 }

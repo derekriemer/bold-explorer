@@ -12,12 +12,16 @@ type CompassMode = (typeof COMPASS_VALUES)[number];
 const BEARING_DISPLAY_VALUES = ['relative', 'clock', 'true'] as const;
 export type BearingDisplayMode = (typeof BEARING_DISPLAY_VALUES)[number];
 
-
-interface Versioned<T> { v: number; value: T; }
+interface Versioned<T> {
+  v: number;
+  value: T;
+}
 
 // ---------- Validators (strict) ----------
-const isLiteral = <T extends readonly string[]> (allowed: T) =>
-  (val: unknown): val is T[number] => typeof val === 'string' && (allowed as readonly string[]).includes(val);
+const isLiteral =
+  <T extends readonly string[]>(allowed: T) =>
+  (val: unknown): val is T[number] =>
+    typeof val === 'string' && (allowed as readonly string[]).includes(val);
 
 const isBoolean = (val: unknown): val is boolean => typeof val === 'boolean';
 
@@ -33,23 +37,19 @@ type PrefSpec<T> = {
   migrations?: Record<number, Migrator<T>>;
 };
 
-async function readRaw (key: string): Promise<string | null>
-{
+async function readRaw(key: string): Promise<string | null> {
   const { value } = await Preferences.get({ key });
   return value ?? null;
 }
 
-async function writeVersioned<T> (key: string, v: number, value: T)
-{
+async function writeVersioned<T>(key: string, v: number, value: T) {
   const payload: Versioned<T> = { v, value };
   await Preferences.set({ key, value: JSON.stringify(payload) });
 }
 
-async function getOrInitWithMigrate<T> (spec: PrefSpec<T>): Promise<T>
-{
+async function getOrInitWithMigrate<T>(spec: PrefSpec<T>): Promise<T> {
   const raw = await readRaw(spec.key);
-  if (raw == null)
-  {
+  if (raw == null) {
     await writeVersioned(spec.key, spec.currentVersion, spec.default);
     return spec.default;
   }
@@ -57,19 +57,15 @@ async function getOrInitWithMigrate<T> (spec: PrefSpec<T>): Promise<T>
   let parsed: Versioned<unknown> | null = null;
 
   // Accept legacy plain values: assume v0 and raw may be primitive or JSON string
-  try
-  {
+  try {
     const maybeObj = JSON.parse(raw);
-    if (maybeObj && typeof maybeObj === 'object' && 'v' in maybeObj && 'value' in maybeObj)
-    {
+    if (maybeObj && typeof maybeObj === 'object' && 'v' in maybeObj && 'value' in maybeObj) {
       parsed = maybeObj as Versioned<unknown>;
-    } else
-    {
+    } else {
       // Legacy JSON without wrapper -> treat as v0
       parsed = { v: 0, value: maybeObj as unknown };
     }
-  } catch
-  {
+  } catch {
     // Not JSON -> legacy primitive string/number/etc at v0
     parsed = { v: 0, value: raw as unknown };
   }
@@ -79,22 +75,18 @@ async function getOrInitWithMigrate<T> (spec: PrefSpec<T>): Promise<T>
 
   // Migrate stepwise
   const migrations = spec.migrations ?? {};
-  while (version < spec.currentVersion)
-  {
+  while (version < spec.currentVersion) {
     const migrate = migrations[version];
-    if (!migrate)
-    {
+    if (!migrate) {
       // No path forward: repair to default
       val = spec.default;
       version = spec.currentVersion;
       break;
     }
-    try
-    {
+    try {
       val = migrate(val as any); // migrator authors ensure type safety across steps
       version += 1;
-    } catch
-    {
+    } catch {
       // Failed migration -> repair
       val = spec.default;
       version = spec.currentVersion;
@@ -103,8 +95,7 @@ async function getOrInitWithMigrate<T> (spec: PrefSpec<T>): Promise<T>
   }
 
   // Validate final
-  if (!spec.validate(val))
-  {
+  if (!spec.validate(val)) {
     val = spec.default;
   }
 
@@ -113,18 +104,19 @@ async function getOrInitWithMigrate<T> (spec: PrefSpec<T>): Promise<T>
   return val as T;
 }
 
-async function setPref<T> (spec: PrefSpec<T>, value: T)
-{
+async function setPref<T>(spec: PrefSpec<T>, value: T) {
   await writeVersioned(spec.key, spec.currentVersion, value);
 }
 
-
 // ---------- migration helpers ----------
 
-function booleanMigrator (old: unknown): boolean
-{
-  if (old === 'true' || old === true) return true;
-  if (old === 'false' || old === false) return false;
+function booleanMigrator(old: unknown): boolean {
+  if (old === 'true' || old === true) {
+    return true;
+  }
+  if (old === 'false' || old === false) {
+    return false;
+  }
   return true; // fallback to default
 }
 
@@ -140,7 +132,8 @@ const UnitsPref: PrefSpec<Units> = {
   validate: isLiteral(UNITS_VALUES),
   migrations: {
     // v0 -> v1 : incoming value may be "metric"/"imperial" or garbage
-    0: (old: unknown) => (typeof old === 'string' && isLiteral(UNITS_VALUES)(old) ? old : 'imperial'),
+    0: (old: unknown) =>
+      typeof old === 'string' && isLiteral(UNITS_VALUES)(old) ? old : 'imperial',
   },
 };
 
@@ -151,9 +144,15 @@ const CompassPref: PrefSpec<CompassMode> = {
   validate: isLiteral(COMPASS_VALUES),
   migrations: {
     0: (old: unknown) => {
-      if (typeof old === 'string' && isLiteral(COMPASS_VALUES)(old)) return old;
-      if (old === true) return 'true';
-      if (old === false) return 'magnetic';
+      if (typeof old === 'string' && isLiteral(COMPASS_VALUES)(old)) {
+        return old;
+      }
+      if (old === true) {
+        return 'true';
+      }
+      if (old === false) {
+        return 'magnetic';
+      }
       return 'magnetic';
     },
   },
@@ -165,7 +164,8 @@ const BearingDisplayPref: PrefSpec<BearingDisplayMode> = {
   default: 'relative',
   validate: isLiteral(BEARING_DISPLAY_VALUES),
   migrations: {
-    0: (old: unknown) => (typeof old === 'string' && isLiteral(BEARING_DISPLAY_VALUES)(old) ? old : 'relative'),
+    0: (old: unknown) =>
+      typeof old === 'string' && isLiteral(BEARING_DISPLAY_VALUES)(old) ? old : 'relative',
   },
 };
 
@@ -180,8 +180,7 @@ const AudioCuesPref: PrefSpec<boolean> = {
 };
 
 // ---------- Pinia store ----------
-interface PrefsState
-{
+interface PrefsState {
   units: Units;
   compassMode: CompassMode;
   bearingDisplayMode: BearingDisplayMode;
@@ -198,21 +197,18 @@ export const usePrefsStore = defineStore('prefs', {
     _hydrated: false,
   }),
   actions: {
-    async hydrate ()
-    {
-      if (this._hydrated) return;
+    async hydrate() {
+      if (this._hydrated) {
+        return;
+      }
 
-      const [
-        loadedUnits,
-        loadedCompassMode,
-        loadedBearingMode,
-        loadedAudioCues,
-      ] = await Promise.all([
-        getOrInitWithMigrate(UnitsPref),
-        getOrInitWithMigrate(CompassPref),
-        getOrInitWithMigrate(BearingDisplayPref),
-        getOrInitWithMigrate(AudioCuesPref),
-      ]);
+      const [loadedUnits, loadedCompassMode, loadedBearingMode, loadedAudioCues] =
+        await Promise.all([
+          getOrInitWithMigrate(UnitsPref),
+          getOrInitWithMigrate(CompassPref),
+          getOrInitWithMigrate(BearingDisplayPref),
+          getOrInitWithMigrate(AudioCuesPref),
+        ]);
 
       this.units = loadedUnits;
       this.compassMode = loadedCompassMode;
@@ -221,26 +217,22 @@ export const usePrefsStore = defineStore('prefs', {
       this._hydrated = true;
     },
 
-    async setUnits (value: Units)
-    {
+    async setUnits(value: Units) {
       this.units = value;
       await setPref(UnitsPref, value);
     },
 
-    async setCompassMode (value: CompassMode)
-    {
+    async setCompassMode(value: CompassMode) {
       this.compassMode = value;
       await setPref(CompassPref, value);
     },
 
-    async setBearingDisplayMode (value: BearingDisplayMode)
-    {
+    async setBearingDisplayMode(value: BearingDisplayMode) {
       this.bearingDisplayMode = value;
       await setPref(BearingDisplayPref, value);
     },
 
-    async setAudioCuesEnabled (value: boolean)
-    {
+    async setAudioCuesEnabled(value: boolean) {
       this.audioCuesEnabled = value;
       await setPref(AudioCuesPref, value);
     },

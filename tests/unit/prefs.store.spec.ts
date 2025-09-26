@@ -7,7 +7,9 @@ vi.mock('@capacitor/preferences', () => {
   return {
     Preferences: {
       async get({ key }: { key: string }): Promise<{ value: string | null }> {
-        return { value: Object.prototype.hasOwnProperty.call(kv, key) ? (kv[key] as string | null) : null };
+        return {
+          value: Object.prototype.hasOwnProperty.call(kv, key) ? (kv[key] as string | null) : null,
+        };
       },
       async set({ key, value }: { key: string; value: string }): Promise<void> {
         kv[key] = value;
@@ -16,9 +18,11 @@ vi.mock('@capacitor/preferences', () => {
         delete kv[key];
       },
       async clear(): Promise<void> {
-        for (const k of Object.keys(kv)) delete kv[k];
-      }
-    }
+        for (const k of Object.keys(kv)) {
+          delete kv[k];
+        }
+      },
+    },
   };
 });
 
@@ -33,12 +37,16 @@ describe('usePrefsStore', () => {
   beforeEach(async () => {
     setActivePinia(createPinia());
     // Clear mock storage before each test
-    for (const k of Object.keys(kv)) delete kv[k];
+    for (const k of Object.keys(kv)) {
+      delete kv[k];
+    }
   });
 
   afterEach(async () => {
     // Ensure storage isolation between tests
-    for (const k of Object.keys(kv)) delete kv[k];
+    for (const k of Object.keys(kv)) {
+      delete kv[k];
+    }
   });
 
   it('hydrates with defaults and persists versioned payloads when empty', async () => {

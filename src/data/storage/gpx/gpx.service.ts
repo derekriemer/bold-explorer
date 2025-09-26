@@ -8,7 +8,10 @@ export async function exportTrailToGpx(trailId: number, opts?: { includeAuto?: b
   return { path: fileName };
 }
 
-export async function exportCollectionToGpx(collectionId: number, opts?: { includeAuto?: boolean }) {
+export async function exportCollectionToGpx(
+  collectionId: number,
+  opts?: { includeAuto?: boolean }
+) {
   void opts;
   const data = `<gpx><collection id="${collectionId}"/></gpx>`;
   const fileName = `collection-${collectionId}.gpx`;
@@ -16,7 +19,9 @@ export async function exportCollectionToGpx(collectionId: number, opts?: { inclu
   return { path: fileName };
 }
 
-export async function importGpx(fileUri: string): Promise<{ createdWaypoints: number[]; createdTrails: number[] }> {
+export async function importGpx(
+  fileUri: string
+): Promise<{ createdWaypoints: number[]; createdTrails: number[] }> {
   void fileUri;
   // Placeholder stub
   return { createdWaypoints: [], createdTrails: [] };

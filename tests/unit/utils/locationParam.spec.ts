@@ -19,4 +19,3 @@ describe('parseCenterParam', () => {
     expect(parseCenterParam('0,200')).toBeNull(); // invalid longitude
   });
 });
-

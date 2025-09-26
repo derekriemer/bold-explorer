@@ -6,7 +6,7 @@ import type { LatLng } from '@/types/latlng';
 export const useWaypoints = defineStore('waypoints', {
   state: () => ({
     byTrail: {} as Record<number, Selectable<Waypoint>[]>,
-    all: [] as Selectable<Waypoint>[]
+    all: [] as Selectable<Waypoint>[],
   }),
   actions: {
     async refreshAll() {
@@ -20,7 +20,10 @@ export const useWaypoints = defineStore('waypoints', {
     async loadForTrail(trailId: number) {
       this.byTrail[trailId] = await this.$repos.waypoints.forTrail(trailId);
     },
-    async addToTrail(trailId: number, input: { name: string; lat: number; lon: number; elev_m?: number | null; position?: number }) {
+    async addToTrail(
+      trailId: number,
+      input: { name: string; lat: number; lon: number; elev_m?: number | null; position?: number }
+    ) {
       const { waypointId } = await this.$repos.waypoints.addToTrail({ trailId, ...input });
       await this.loadForTrail(trailId);
       return waypointId;
@@ -40,7 +43,16 @@ export const useWaypoints = defineStore('waypoints', {
     async rename(id: number, name: string) {
       await this.$repos.waypoints.rename(id, name);
     },
-    async update(id: number, patch: { name?: string; lat?: number; lon?: number; elev_m?: number | null; description?: string | null }) {
+    async update(
+      id: number,
+      patch: {
+        name?: string;
+        lat?: number;
+        lon?: number;
+        elev_m?: number | null;
+        description?: string | null;
+      }
+    ) {
       await this.$repos.waypoints.update(id, patch);
     },
     async remove(id: number) {
@@ -48,6 +60,6 @@ export const useWaypoints = defineStore('waypoints', {
     },
     async withDistanceFrom(center: LatLng, opts?: { trailId?: number; limit?: number }) {
       return this.$repos.waypoints.withDistanceFrom(center, opts);
-    }
-  }
+    },
+  },
 });

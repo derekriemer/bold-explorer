@@ -105,7 +105,8 @@ const props = defineProps<{
   disableResetCurrent: boolean;
 }>();
 
-const { isOpen, bearingText, statusText, bearingField, disableMatchWaypoint, disableResetCurrent } = toRefs(props);
+const { isOpen, bearingText, statusText, bearingField, disableMatchWaypoint, disableResetCurrent } =
+  toRefs(props);
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -120,17 +121,37 @@ const emit = defineEmits<{
 
 const inputRef = ref<AlignmentInputElement | null>(null);
 
-function emitClose () { emit('close'); }
-function onDidDismiss () { emit('didDismiss'); }
-function onInput (event: AlignmentInputEvent) { emit('ionInput', event); }
-function onCommit (event: AlignmentInputEvent) { emit('commit', event); }
-function onBlur () { emit('commit'); }
-function emitStartAdjust (direction: -1 | 1) { emit('startAdjust', direction); }
-function emitStopAdjust () { emit('stopAdjust'); }
-function emitMatchWaypoint () { emit('matchWaypoint'); }
-function emitResetCurrent () { emit('resetCurrent'); }
+function emitClose() {
+  emit('close');
+}
+function onDidDismiss() {
+  emit('didDismiss');
+}
+function onInput(event: AlignmentInputEvent) {
+  emit('ionInput', event);
+}
+function onCommit(event: AlignmentInputEvent) {
+  emit('commit', event);
+}
+function onBlur() {
+  emit('commit');
+}
+function emitStartAdjust(direction: -1 | 1) {
+  emit('startAdjust', direction);
+}
+function emitStopAdjust() {
+  emit('stopAdjust');
+}
+function emitMatchWaypoint() {
+  emit('matchWaypoint');
+}
+function emitResetCurrent() {
+  emit('resetCurrent');
+}
 
-function focusInput () { inputRef.value?.setFocus?.(); }
+function focusInput() {
+  inputRef.value?.setFocus?.();
+}
 
 defineExpose({ focusInput });
 </script>

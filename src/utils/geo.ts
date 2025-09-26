@@ -34,8 +34,7 @@ export const EPS_COS_LAT_POLE = 1e-6;
  *   good approximation for most applications.
  * - Returns meters.
  */
-export function haversineDistanceMeters (a: LatLng, b: LatLng): number
-{
+export function haversineDistanceMeters(a: LatLng, b: LatLng): number {
   const R = EARTH_R;
   const dLat = (b.lat - a.lat) * DEG_TO_RAD;
   const dLon = (b.lon - a.lon) * DEG_TO_RAD;
@@ -48,8 +47,7 @@ export function haversineDistanceMeters (a: LatLng, b: LatLng): number
   return R * c;
 }
 
-export function initialBearingDeg (a: LatLng, b: LatLng): number
-{
+export function initialBearingDeg(a: LatLng, b: LatLng): number {
   const lat1 = a.lat * DEG_TO_RAD;
   const lat2 = b.lat * DEG_TO_RAD;
   const dLon = (b.lon - a.lon) * DEG_TO_RAD;
@@ -59,32 +57,29 @@ export function initialBearingDeg (a: LatLng, b: LatLng): number
   return (brng + 360) % 360;
 }
 
-export function deltaHeadingDeg (heading: number, bearing: number): number
-{
-  const d = (heading - bearing + 540) % 360 - 180; // range [-180, 180)
+export function deltaHeadingDeg(heading: number, bearing: number): number {
+  const d = ((heading - bearing + 540) % 360) - 180; // range [-180, 180)
   return d;
 }
 
 // Kysely SQL helper: compute haversine distance in meters for a table alias
 // Example: sqlDistanceMetersForAlias('w', {lat, lon}) -> RawBuilder<number> as 'distance_m'
-export function sqlDistanceMetersForAlias (alias: string, center: LatLng)
-{
+export function sqlDistanceMetersForAlias(alias: string, center: LatLng) {
   // Defend against identifier injection: only allow simple SQL identifiers
   // (letters/underscore start, then letters/digits/underscore). Callers pass
   // a constant like 'w' in current usage.
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias))
-  {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
     throw new Error('Invalid SQL alias');
   }
   assertLatLng(center);
-  const latRef = sql.ref(`${ alias }.lat`);
-  const lonRef = sql.ref(`${ alias }.lon`);
+  const latRef = sql.ref(`${alias}.lat`);
+  const lonRef = sql.ref(`${alias}.lon`);
   return sql<number>`
-    ${ 2 * EARTH_R } * asin(
+    ${2 * EARTH_R} * asin(
       sqrt(
-        pow(sin((${ DEG_TO_RAD } * (${ latRef } - ${ center.lat })) / 2.0), 2) +
-        cos(${ DEG_TO_RAD } * ${ center.lat }) * cos(${ DEG_TO_RAD } * ${ latRef }) *
-        pow(sin((${ DEG_TO_RAD } * (${ lonRef } - ${ center.lon })) / 2.0), 2)
+        pow(sin((${DEG_TO_RAD} * (${latRef} - ${center.lat})) / 2.0), 2) +
+        cos(${DEG_TO_RAD} * ${center.lat}) * cos(${DEG_TO_RAD} * ${latRef}) *
+        pow(sin((${DEG_TO_RAD} * (${lonRef} - ${center.lon})) / 2.0), 2)
       )
     )
   `.as('distance_m');
@@ -92,8 +87,7 @@ export function sqlDistanceMetersForAlias (alias: string, center: LatLng)
 
 // Compute bbox bounds for a radius (meters) around a center point.
 // Handles latitude clamp and detects anti-meridian crossing. Also indicates whether a lon filter is needed.
-export function computeBbox (center: LatLng, radiusM = DEFAULT_BBOX_RADIUS_M)
-{
+export function computeBbox(center: LatLng, radiusM = DEFAULT_BBOX_RADIUS_M) {
   const degLat = radiusM / METERS_PER_DEG_LAT;
   const latMin = Math.max(-90, center.lat - degLat);
   const latMax = Math.min(90, center.lat + degLat);
@@ -103,21 +97,17 @@ export function computeBbox (center: LatLng, radiusM = DEFAULT_BBOX_RADIUS_M)
   let crossing = false;
   let lonMin = -180;
   let lonMax = 180;
-  if (Math.abs(cosLat) < EPS_COS_LAT_POLE)
-  {
+  if (Math.abs(cosLat) < EPS_COS_LAT_POLE) {
     needsLonFilter = false; // near poles: longitude is not meaningful for narrowing
-  } else
-  {
+  } else {
     const degLon = radiusM / (METERS_PER_DEG_LAT * cosLat);
-    if (degLon >= 180)
-    {
+    if (degLon >= 180) {
       needsLonFilter = false; // covers the globe
-    } else
-    {
+    } else {
       const lonMinRaw = center.lon - degLon;
       const lonMaxRaw = center.lon + degLon;
       crossing = lonMinRaw < -180 || lonMaxRaw > 180;
-      const norm = (x: number) => ((x + 180) % 360 + 360) % 360 - 180;
+      const norm = (x: number) => ((((x + 180) % 360) + 360) % 360) - 180;
       lonMin = crossing ? norm(lonMinRaw) : lonMinRaw;
       lonMax = crossing ? norm(lonMaxRaw) : lonMaxRaw;
     }
@@ -127,11 +117,10 @@ export function computeBbox (center: LatLng, radiusM = DEFAULT_BBOX_RADIUS_M)
 
 // Build SQL expressions for coarse ordering by proximity components.
 // Returns expressions for |Δlat| and cyclic |Δlon| suitable for ORDER BY.
-export function sqlCoarseOrderExprsForCenter (center: LatLng)
-{
-  const absLat = sql`abs(w.lat - ${ center.lat })`;
-  const absDeltaLon = sql`abs(w.lon - ${ center.lon })`;
-  const absLonCyclic = sql`CASE WHEN ${ absDeltaLon } > 180 THEN 360 - ${ absDeltaLon } ELSE ${ absDeltaLon } END`;
+export function sqlCoarseOrderExprsForCenter(center: LatLng) {
+  const absLat = sql`abs(w.lat - ${center.lat})`;
+  const absDeltaLon = sql`abs(w.lon - ${center.lon})`;
+  const absLonCyclic = sql`CASE WHEN ${absDeltaLon} > 180 THEN 360 - ${absDeltaLon} ELSE ${absDeltaLon} END`;
   return { absLat, absLonCyclic } as const;
 }
 
@@ -163,33 +152,31 @@ export function sqlCoarseOrderExprsForCenter (center: LatLng)
  *             `radiusM` to adjust candidate bbox radius (meters, default DEFAULT_BBOX_RADIUS_M).
  * @returns Array of waypoints augmented with `distance_m` (meters), ordered nearest first.
  */
-export async function fetchWaypointsWithDistance (
+export async function fetchWaypointsWithDistance(
   db: Kysely<DB>,
   center: LatLng,
   opts?: { trailId?: number; limit?: number; radiusM?: number }
-): Promise<Array<Selectable<Waypoint> & { distance_m: number }>>
-{
-  const { latMin, latMax, lonMin, lonMax, needsLonFilter, crossing } = computeBbox(center, opts?.radiusM ?? DEFAULT_BBOX_RADIUS_M);
+): Promise<Array<Selectable<Waypoint> & { distance_m: number }>> {
+  const { latMin, latMax, lonMin, lonMax, needsLonFilter, crossing } = computeBbox(
+    center,
+    opts?.radiusM ?? DEFAULT_BBOX_RADIUS_M
+  );
 
   let base = db
     .selectFrom('waypoint as w')
     .$if(!!opts?.trailId, (qb: any) =>
-      qb.innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id').where('tw.trail_id', '=', opts!.trailId!)
+      qb
+        .innerJoin('trail_waypoint as tw', 'tw.waypoint_id', 'w.id')
+        .where('tw.trail_id', '=', opts!.trailId!)
     )
     .where('w.lat', '>=', latMin)
     .where('w.lat', '<=', latMax);
 
-  if (needsLonFilter)
-  {
-    if (crossing)
-    {
+  if (needsLonFilter) {
+    if (crossing) {
       // Anti-meridian crossing: longitudes wrap, so express as (lon >= min OR lon <= max)
-      base = base.where((eb) => eb.or([
-        eb('w.lon', '>=', lonMin),
-        eb('w.lon', '<=', lonMax)
-      ]));
-    } else
-    {
+      base = base.where((eb) => eb.or([eb('w.lon', '>=', lonMin), eb('w.lon', '<=', lonMax)]));
+    } else {
       base = base.where('w.lon', '>=', lonMin).where('w.lon', '<=', lonMax);
     }
   }
@@ -206,7 +193,7 @@ export async function fetchWaypointsWithDistance (
 
   const mapped = (rows as any[]).map((w) => ({
     ...w,
-    distance_m: haversineDistanceMeters(center, { lat: w.lat, lon: w.lon })
+    distance_m: haversineDistanceMeters(center, { lat: w.lat, lon: w.lon }),
   })) as Array<Selectable<Waypoint> & { distance_m: number }>;
   mapped.sort((a, b) => a.distance_m - b.distance_m);
   return opts?.limit ? mapped.slice(0, opts.limit) : mapped;

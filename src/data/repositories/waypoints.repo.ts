@@ -107,7 +107,9 @@ export class WaypointsRepo {
         .where('trail_id', '=', trailId)
         .where('waypoint_id', '=', waypointId)
         .executeTakeFirst();
-      if (!current) return;
+      if (!current) {
+        return;
+      }
       const a = current.position;
       const b = position;
       if (a < b) {
@@ -144,7 +146,9 @@ export class WaypointsRepo {
         .where('trail_id', '=', trailId)
         .where('waypoint_id', '=', waypointId)
         .executeTakeFirst();
-      if (!row) return;
+      if (!row) {
+        return;
+      }
       const removed = row.position;
       await trx
         .deleteFrom('trail_waypoint')
@@ -180,12 +184,24 @@ export class WaypointsRepo {
     }
   ): Promise<void> {
     const upd: any = {};
-    if (patch.name != null) upd.name = patch.name;
-    if (patch.lat != null) upd.lat = patch.lat;
-    if (patch.lon != null) upd.lon = patch.lon;
-    if (patch.elev_m !== undefined) upd.elev_m = patch.elev_m;
-    if (patch.description !== undefined) upd.description = patch.description;
-    if (Object.keys(upd).length === 0) return;
+    if (patch.name != null) {
+      upd.name = patch.name;
+    }
+    if (patch.lat != null) {
+      upd.lat = patch.lat;
+    }
+    if (patch.lon != null) {
+      upd.lon = patch.lon;
+    }
+    if (patch.elev_m !== undefined) {
+      upd.elev_m = patch.elev_m;
+    }
+    if (patch.description !== undefined) {
+      upd.description = patch.description;
+    }
+    if (Object.keys(upd).length === 0) {
+      return;
+    }
     await this.db.updateTable('waypoint').set(upd).where('id', '=', id).execute();
   }
 

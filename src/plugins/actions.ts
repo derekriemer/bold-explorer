@@ -7,4 +7,3 @@ export function installActions(app: App) {
   app.provide(ActionServiceKey, actionsService);
   (app.config.globalProperties as any).$actions = actionsService;
 }
-

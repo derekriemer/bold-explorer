@@ -5,14 +5,22 @@ import { webDbAvailable, defineDbLifecycle } from './fixtures/test-db';
 describe('WaypointsRepo.create validation', () => {
   it('rejects latitude outside [-90, 90]', async () => {
     const repo = new WaypointsRepo({} as any);
-    await expect(repo.create({ name: 'WP', lat: 100, lon: 0 })).rejects.toThrow(/Invalid coordinates/);
-    await expect(repo.create({ name: 'WP', lat: -91, lon: 0 })).rejects.toThrow(/Invalid coordinates/);
+    await expect(repo.create({ name: 'WP', lat: 100, lon: 0 })).rejects.toThrow(
+      /Invalid coordinates/
+    );
+    await expect(repo.create({ name: 'WP', lat: -91, lon: 0 })).rejects.toThrow(
+      /Invalid coordinates/
+    );
   });
 
   it('rejects longitude outside [-180, 180]', async () => {
     const repo = new WaypointsRepo({} as any);
-    await expect(repo.create({ name: 'WP', lat: 0, lon: 181 })).rejects.toThrow(/Invalid coordinates/);
-    await expect(repo.create({ name: 'WP', lat: 0, lon: -181 })).rejects.toThrow(/Invalid coordinates/);
+    await expect(repo.create({ name: 'WP', lat: 0, lon: 181 })).rejects.toThrow(
+      /Invalid coordinates/
+    );
+    await expect(repo.create({ name: 'WP', lat: 0, lon: -181 })).rejects.toThrow(
+      /Invalid coordinates/
+    );
   });
 });
 

@@ -1,16 +1,8 @@
 <template>
   <ion-item>
     <ion-label>Waypoint</ion-label>
-    <ion-select
-      v-model="internalSelectedId"
-      interface="popover"
-      placeholder="None selected"
-    >
-      <ion-select-option
-        v-for="wp in waypoints"
-        :key="wp.id"
-        :value="wp.id"
-      >
+    <ion-select v-model="internalSelectedId" interface="popover" placeholder="None selected">
+      <ion-select-option v-for="wp in waypoints" :key="wp.id" :value="wp.id">
         {{ wp.name }}
       </ion-select-option>
     </ion-select>
@@ -27,13 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  IonItem,
-  IonLabel,
-  IonSelect,
-  IonSelectOption,
-  IonButton,
-} from '@ionic/vue';
+import { IonItem, IonLabel, IonSelect, IonSelectOption, IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 const props = defineProps<{

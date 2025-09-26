@@ -10,8 +10,7 @@ type Scope = GpsUiScope;
  * Manage target selection between a single waypoint and the next waypoint in a trail.
  * Accepts sources for waypoints and trail waypoints and computes a single target.
  */
-function toSafeLatLng(coord: CoordInput): LatLng
-{
+function toSafeLatLng(coord: CoordInput): LatLng {
   return isLatLng(coord) ? coord : toLatLng(coord.lat, coord.lon);
 }
 
@@ -30,35 +29,25 @@ type TargetProviders = {
   };
 };
 
-export function useTarget(args: {
-  scope: Ref<Scope>;
-  providers: TargetProviders;
-})
-{
-  const pickByIndex = (list: NamedCoord[], idx: number | null | undefined) =>
-  {
+export function useTarget(args: { scope: Ref<Scope>; providers: TargetProviders }) {
+  const pickByIndex = (list: NamedCoord[], idx: number | null | undefined) => {
     const safeIndex = typeof idx === 'number' && idx >= 0 ? idx : 0;
     return list[safeIndex] ?? null;
   };
 
-  const targetCoord = computed<LatLng | null>(() =>
-  {
-    switch (args.scope.value)
-    {
-      case 'waypoint':
-      {
+  const targetCoord = computed<LatLng | null>(() => {
+    switch (args.scope.value) {
+      case 'waypoint': {
         const { items, selectedId } = args.providers.waypoint;
-        const t = items.value.find(w => w.id === selectedId.value);
+        const t = items.value.find((w) => w.id === selectedId.value);
         return t ? toSafeLatLng(t) : null;
       }
-      case 'trail':
-      {
+      case 'trail': {
         const { items, currentIndex } = args.providers.trail;
         const t = pickByIndex(items.value, currentIndex?.value ?? 0);
         return t ? toSafeLatLng(t) : null;
       }
-      case 'collection':
-      {
+      case 'collection': {
         const { items, currentIndex } = args.providers.collection;
         const t = pickByIndex(items.value, currentIndex?.value ?? 0);
         return t ? toSafeLatLng(t) : null;
@@ -68,24 +57,19 @@ export function useTarget(args: {
     }
   });
 
-  const targetName = computed<string | null>(() =>
-  {
-    switch (args.scope.value)
-    {
-      case 'waypoint':
-      {
+  const targetName = computed<string | null>(() => {
+    switch (args.scope.value) {
+      case 'waypoint': {
         const { items, selectedId } = args.providers.waypoint;
-        const t = items.value.find(w => w.id === selectedId.value);
+        const t = items.value.find((w) => w.id === selectedId.value);
         return t?.name ?? null;
       }
-      case 'trail':
-      {
+      case 'trail': {
         const { items, currentIndex } = args.providers.trail;
         const t = pickByIndex(items.value, currentIndex?.value ?? 0);
         return t?.name ?? null;
       }
-      case 'collection':
-      {
+      case 'collection': {
         const { items, currentIndex } = args.providers.collection;
         const t = pickByIndex(items.value, currentIndex?.value ?? 0);
         return t?.name ?? null;
@@ -95,11 +79,13 @@ export function useTarget(args: {
     }
   });
 
-  function clear(): void { args.providers.waypoint.selectedId.value = null; }
+  function clear(): void {
+    args.providers.waypoint.selectedId.value = null;
+  }
 
   return {
     targetCoord,
     targetName,
-    clear
+    clear,
   } as const;
 }

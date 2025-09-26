@@ -9,7 +9,9 @@ try {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - dynamic import, optional dep
   await import(/* @vite-ignore */ mod);
-} catch (e) { console.warn('[tests/setup] optional fake-indexeddb not available', e); }
+} catch (e) {
+  console.warn('[tests/setup] optional fake-indexeddb not available', e);
+}
 import { defineCustomElements as jeepSqlite } from 'jeep-sqlite/loader';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorSQLite } from '@capacitor-community/sqlite';
@@ -36,26 +38,37 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 function resolveSqlJsAsset(name: string): string | null {
   // Try public/assets first (if copy script was run)
   const publicCandidate = path.join(process.cwd(), 'public', 'assets', name);
-  if (fs.existsSync(publicCandidate)) return publicCandidate;
+  if (fs.existsSync(publicCandidate)) {
+    return publicCandidate;
+  }
 
   // Try node resolution (direct dep)
   try {
     const pkg = require.resolve('sql.js/package.json');
     const root = path.dirname(pkg);
     const direct = path.join(root, 'dist', name);
-    if (fs.existsSync(direct)) return direct;
-  } catch (e) { console.warn('[tests/setup] resolveSqlJsAsset (node resolution) failed', e); }
+    if (fs.existsSync(direct)) {
+      return direct;
+    }
+  } catch (e) {
+    console.warn('[tests/setup] resolveSqlJsAsset (node resolution) failed', e);
+  }
 
   // Try pnpm nested path: node_modules/.pnpm/sql.js@*/node_modules/sql.js/dist
   try {
     const pnpmDir = path.join(process.cwd(), 'node_modules', '.pnpm');
-    const entries = fs.readdirSync(pnpmDir, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name.startsWith('sql.js@'))
-      .map(d => path.join(pnpmDir, d.name, 'node_modules', 'sql.js', 'dist', name));
+    const entries = fs
+      .readdirSync(pnpmDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && d.name.startsWith('sql.js@'))
+      .map((d) => path.join(pnpmDir, d.name, 'node_modules', 'sql.js', 'dist', name));
     for (const candidate of entries) {
-      if (fs.existsSync(candidate)) return candidate;
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
     }
-  } catch (e) { console.warn('[tests/setup] resolveSqlJsAsset (pnpm path) failed', e); }
+  } catch (e) {
+    console.warn('[tests/setup] resolveSqlJsAsset (pnpm path) failed', e);
+  }
 
   return null;
 }
@@ -83,4 +96,6 @@ try {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (CapacitorSQLite as any).initWebStore();
   }
-} catch (e) { console.warn('[tests/setup] CapacitorSQLite.initWebStore not available', e); }
+} catch (e) {
+  console.warn('[tests/setup] CapacitorSQLite.initWebStore not available', e);
+}

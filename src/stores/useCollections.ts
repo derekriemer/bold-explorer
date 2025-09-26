@@ -3,7 +3,13 @@ import type { Selectable } from 'kysely';
 import type { Collection, Waypoint, Trail } from '@/db/schema';
 
 export const useCollections = defineStore('collections', {
-  state: () => ({ list: [] as Selectable<Collection>[], contents: {} as Record<number, { waypoints: Selectable<Waypoint>[]; trails: Selectable<Trail>[] }> }),
+  state: () => ({
+    list: [] as Selectable<Collection>[],
+    contents: {} as Record<
+      number,
+      { waypoints: Selectable<Waypoint>[]; trails: Selectable<Trail>[] }
+    >,
+  }),
   actions: {
     async refresh() {
       this.list = await this.$repos.collections.all();
@@ -31,6 +37,6 @@ export const useCollections = defineStore('collections', {
     },
     async loadContents(collectionId: number) {
       this.contents[collectionId] = await this.$repos.collections.contents(collectionId);
-    }
-  }
+    },
+  },
 });

@@ -3,7 +3,7 @@ import { registerPlugin } from '@capacitor/core';
 
 export interface HeadingReading {
   magnetic: number; // 0..360, 0=N
-  true?: number;    // if declination applied
+  true?: number; // if declination applied
   accuracy?: number; // iOS headingAccuracy (deg) or Android azimuth stddev
 }
 

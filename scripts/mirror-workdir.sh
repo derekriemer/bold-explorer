@@ -135,6 +135,7 @@ if [[ "$DAEMON" -eq 1 ]]; then
     exit 1
   fi
   [[ -z "$LOG_FILE" ]] && LOG_FILE="$DEST_DIR/.mirror-workdir.log"
+  [[ -z "$PID_FILE" ]] && PID_FILE="$SRC_DIR/daemon_file"
 
   if ! command -v nohup >/dev/null; then
     echo "Error: nohup is required for --daemon mode." >&2

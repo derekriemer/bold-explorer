@@ -7,7 +7,7 @@ SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_NAME"
 
 show_help() {
   cat <<'USAGE'
-Usage: mirror-workdir.sh --dest <path> [--dry-run] [--watch] [--interval <seconds>] [--daemon] [--log <file>] [--pid-file <file>]
+Usage: mirror-workdir.sh --dest <path> [--dry-run] [--watch] [--interval <seconds>] [--daemon] [--log <file>] [--pid-file <file>] [--quiet|--verbose]
 
 Mirrors the repository (excluding build artifacts and patterns from .gitignore)
 into the specified destination using rsync.
@@ -20,6 +20,8 @@ Options:
   --daemon         Detach and keep syncing in the background (implies --watch).
   --log <file>     Log output when running with --daemon (default: <dest>/.mirror-workdir.log).
   --pid-file <f>   Write background process PID to this file when --daemon is used.
+  --quiet          Suppress rsync progress output (default when --watch).
+  --verbose        Show rsync progress output.
   -h, --help       Display this help message.
 USAGE
 }
@@ -32,6 +34,7 @@ DAEMON=0
 LOG_FILE=""
 PID_FILE=""
 QUIET=0
+QUIET_SET=0
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -44,6 +47,7 @@ while [[ $# -gt 0 ]]; do
       RSYNC_ARGS+=(--dry-run)
       DRY_RUN=1
       QUIET=0
+      QUIET_SET=1
       shift
       ;;
     --watch)
@@ -66,6 +70,16 @@ while [[ $# -gt 0 ]]; do
     --pid-file)
       PID_FILE="$2"
       shift 2
+      ;;
+    --quiet)
+      QUIET=1
+      QUIET_SET=1
+      shift
+      ;;
+    --verbose|--no-quiet)
+      QUIET=0
+      QUIET_SET=1
+      shift
       ;;
     -h|--help)
       show_help
@@ -137,12 +151,24 @@ if [[ "$DAEMON" -eq 1 ]]; then
   [[ -z "$LOG_FILE" ]] && LOG_FILE="$DEST_DIR/.mirror-workdir.log"
   [[ -z "$PID_FILE" ]] && PID_FILE="$SRC_DIR/daemon_file"
 
+  QUIET_ARGS=()
+  if [[ "$QUIET_SET" -eq 1 ]]; then
+    if [[ "$QUIET" -eq 1 ]]; then
+      QUIET_ARGS=(--quiet)
+    else
+      QUIET_ARGS=(--verbose)
+    fi
+  fi
+
   if ! command -v nohup >/dev/null; then
     echo "Error: nohup is required for --daemon mode." >&2
     exit 1
   fi
 
   CMD=("$SCRIPT_PATH" --dest "$DEST_DIR" --watch --interval "$INTERVAL")
+  if [[ ${#QUIET_ARGS[@]} -gt 0 ]]; then
+    CMD+=("${QUIET_ARGS[@]}")
+  fi
   nohup "${CMD[@]}" >> "$LOG_FILE" 2>&1 &
   DAEMON_PID=$!
   if [[ -n "$PID_FILE" ]]; then
@@ -153,7 +179,9 @@ if [[ "$DAEMON" -eq 1 ]]; then
 fi
 
 if [[ "$WATCH" -eq 1 ]]; then
-  QUIET=1
+  if [[ "$QUIET_SET" -eq 0 ]]; then
+    QUIET=1
+  fi
   while true; do
     run_sync
     sleep "$INTERVAL"

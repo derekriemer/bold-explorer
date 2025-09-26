@@ -117,6 +117,34 @@ EXCLUDES=(
 
 RSYNC_CMD=()
 
+append_gitignore_excludes_for() {
+  local prefix="$1"
+  local gitignore="$2"
+  [[ -f "$gitignore" ]] || return
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line=${line%%#*}
+    line=${line%$'\r'}
+    line="${line#${line%%[![:space:]]*}}"
+    line="${line%${line##*[![:space:]]}}"
+    [[ -n "$line" ]] || continue
+    [[ ${line:0:1} == '!' ]] && continue
+
+    local pattern="$line"
+    if [[ ${pattern:0:1} == '/' ]]; then
+      pattern=${pattern#/}
+    fi
+    if [[ -n "$prefix" ]]; then
+      pattern="${prefix}/${pattern}"
+    fi
+    EXCLUDES+=("--exclude=${pattern}")
+  done < "$gitignore"
+}
+
+# Honor repository-level ignores and android-specific ignores.
+append_gitignore_excludes_for "" "$SRC_DIR/.gitignore"
+append_gitignore_excludes_for "android" "$SRC_DIR/android/.gitignore"
+
 build_rsync_cmd() {
   RSYNC_CMD=(rsync "${RSYNC_ARGS[@]}" -v)
   RSYNC_CMD+=("${EXCLUDES[@]}")

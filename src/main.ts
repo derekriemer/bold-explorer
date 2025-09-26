@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { createApp } from 'vue';
 import { defineCustomElements as jeepSqlite } from 'jeep-sqlite/loader';
 import App from './App.vue';
@@ -45,18 +46,21 @@ async function bootstrap() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Error as any).stackTraceLimit = 50;
   }
-  // Register the jeep-sqlite custom element (web sqlite bridge)
-  if (typeof window !== 'undefined') {
-    jeepSqlite(window);
-    await customElements.whenDefined('jeep-sqlite');
-    let el = document.querySelector('jeep-sqlite') as any;
-    if (!el) {
-      el = document.createElement('jeep-sqlite');
-      document.body.appendChild(el);
+
+  if (Capacitor.getPlatform() === 'web') {
+    // Register the jeep-sqlite custom element (web sqlite bridge)
+    if (typeof window !== 'undefined') {
+      jeepSqlite(window);
+      await customElements.whenDefined('jeep-sqlite');
+      let el = document.querySelector('jeep-sqlite') as any;
+      if (!el) {
+        el = document.createElement('jeep-sqlite');
+        document.body.appendChild(el);
+      }
+      // Use default wasm path (/assets). Keep element visible for debugging.
+      // eslint-disable-next-line no-console
+      console.info('[jeep-sqlite] using default wasm path (/assets)');
     }
-    // Use default wasm path (/assets). Keep element visible for debugging.
-    // eslint-disable-next-line no-console
-    console.info('[jeep-sqlite] using default wasm path (/assets)');
   }
   const pinia = createPinia();
   await installRepositories(pinia);
@@ -64,10 +68,7 @@ async function bootstrap() {
   const prefs = usePrefsStore(pinia);
   await prefs.hydrate();
 
-  const app = createApp(App)
-    .use(IonicVue)
-    .use(pinia)
-    .use(router);
+  const app = createApp(App).use(IonicVue).use(pinia).use(router);
 
   installActions(app);
 

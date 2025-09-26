@@ -8,7 +8,6 @@ import { createPinia } from 'pinia';
 import { usePrefsStore } from '@/stores/usePrefs';
 import { installRepositories } from './plugins/repositories';
 import { installActions } from './plugins/actions';
-import '@/services/location/locationDebugService';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/vue/css/core.css';

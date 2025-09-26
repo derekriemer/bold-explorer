@@ -163,7 +163,7 @@ import { useWaypoints } from '@/stores/useWaypoints';
 import { locationStream, providerRegistry, type LocationStreamMetaEvent } from '@/data/streams/location';
 import { useActions } from '@/composables/useActions';
 import { Heading } from '@/plugins/heading';
-import type { ProviderKind } from '@/types';
+import { toLatLng, type ProviderKind } from '@/types';
 import { usePermissionAlert } from '@/composables/usePermissionAlert';
 
 type Fix = {
@@ -489,7 +489,11 @@ async function runDiagnostics ()
   let tempId: number | null = null;
   try
   {
-    tempId = await wps.$repos.waypoints.create({ name: `diag-${ Date.now() }`, lat: 0, lon: 0, elev_m: null } as any);
+    tempId = await wps.$repos.waypoints.create({
+      name: `diag-${ Date.now() }`,
+      latLng: toLatLng(0, 0),
+      elev_m: null
+    });
     out.createOk = Number.isFinite(tempId);
   } catch (e: any)
   {

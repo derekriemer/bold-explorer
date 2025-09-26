@@ -250,7 +250,7 @@ import {
 import { useActions } from '@/composables/useActions';
 import { Heading } from '@/plugins/heading';
 import { locationDebugService } from '@/services/location/locationDebugService';
-import type { ProviderKind } from '@/types';
+import { toLatLng, type ProviderKind } from '@/types';
 import { usePermissionAlert } from '@/composables/usePermissionAlert';
 
 type Fix = {
@@ -603,10 +603,9 @@ async function runDiagnostics() {
   try {
     tempId = await wps.$repos.waypoints.create({
       name: `diag-${Date.now()}`,
-      lat: 0,
-      lon: 0,
+      latLng: toLatLng(0, 0),
       elev_m: null,
-    } as any);
+    });
     out.createOk = Number.isFinite(tempId);
   } catch (e: any) {
     out.error = `Create failed: ${e?.message ?? String(e)}`;

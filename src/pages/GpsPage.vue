@@ -606,8 +606,7 @@ async function markWaypoint() {
   }
   const point = {
     name: `WP ${new Date().toLocaleTimeString()}`,
-    lat: gps.value.lat,
-    lon: gps.value.lon,
+    latLng: toLatLng(gps.value.lat, gps.value.lon),
     elev_m: null,
   };
   try {

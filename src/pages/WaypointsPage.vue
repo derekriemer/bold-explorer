@@ -298,7 +298,7 @@ function handleAddConfirm(data: any): boolean {
   }
   // Fire async creation and allow alert to close immediately
   (async () => {
-    const id = await wps.create({ name, lat, lon, elev_m: elev });
+    const id = await wps.create({ name, latLng: toLatLng(lat, lon), elev_m: elev });
     await wps.refreshAll();
     if (liveUpdates.value || Object.keys(distances.value).length > 0) {
       await refreshDistances();
@@ -352,7 +352,7 @@ function handleEditConfirm(data: any, payload?: EditAlertPayload): boolean {
   (async () => {
     const id = payload.id;
     const prev = payload.prevSnapshot ? { ...payload.prevSnapshot } : null;
-    await wps.update(id, { name, lat, lon, elev_m: elev });
+    await wps.update(id, { name, latLng: toLatLng(lat, lon), elev_m: elev });
     await wps.refreshAll();
     if (liveUpdates.value || Object.keys(distances.value).length > 0) {
       await refreshDistances();
@@ -364,8 +364,7 @@ function handleEditConfirm(data: any, payload?: EditAlertPayload): boolean {
         ? async () => {
             await wps.update(id, {
               name: prev.name,
-              lat: prev.lat,
-              lon: prev.lon,
+              latLng: toLatLng(prev.lat, prev.lon),
               elev_m: prev.elev_m ?? null,
             });
             await wps.refreshAll();
@@ -404,8 +403,7 @@ function handleDeleteConfirm(payload?: DeleteAlertPayload): boolean {
         ? async () => {
             await wps.create({
               name: snap.name,
-              lat: snap.lat,
-              lon: snap.lon,
+              latLng: toLatLng(snap.lat, snap.lon),
               elev_m: snap.elev_m ?? null,
             });
             await wps.refreshAll();

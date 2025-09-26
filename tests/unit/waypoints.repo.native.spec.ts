@@ -3,6 +3,7 @@ import { Kysely, SqliteDialect } from 'kysely';
 import type { DB } from '@/db/schema';
 import { createMigrator } from '@/db/migrations/provider';
 import { WaypointsRepo } from '@/data/repositories/waypoints.repo';
+import { toLatLng } from '@/types/latlng';
 
 // Old/native path using better-sqlite3(':memory:').
 // Gated to run only when DB_NATIVE=1 is set.
@@ -43,6 +44,7 @@ describe.skipIf(!DB_NATIVE_ENABLED || !NATIVE_AVAILABLE)(
       db = null;
     });
 
+<<<<<<< HEAD
     it('creates and lists a waypoint (timed)', async () => {
       const start = Date.now();
       const repo = new WaypointsRepo(db as any);
@@ -57,3 +59,21 @@ describe.skipIf(!DB_NATIVE_ENABLED || !NATIVE_AVAILABLE)(
     });
   }
 );
+=======
+  it('creates and lists a waypoint (timed)', async () => {
+    const start = Date.now();
+    const repo = new WaypointsRepo(db as any);
+    const id = await repo.create({ name: 'Valid', latLng: toLatLng(12.34, 56.78) });
+    expect(id).toBeGreaterThan(0);
+    const all = await (db as Kysely<DB>)
+      .selectFrom('waypoint')
+      .selectAll()
+      .execute();
+    const end = Date.now();
+    // eslint-disable-next-line no-console
+    console.log(`[native] create+list took ${end - start} ms`);
+    expect(all.length).toBe(1);
+    expect(all[0]?.name).toBe('Valid');
+  });
+});
+>>>>>>> 1b25e4d900e07625a8e45c8715c7e576215cf590

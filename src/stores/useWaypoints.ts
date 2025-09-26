@@ -12,7 +12,7 @@ export const useWaypoints = defineStore('waypoints', {
     async refreshAll() {
       this.all = await this.$repos.waypoints.all();
     },
-    async create(input: { name: string; lat: number; lon: number; elev_m?: number | null }) {
+    async create(input: { name: string; latLng: LatLng; elev_m?: number | null }) {
       const id = await this.$repos.waypoints.create(input);
       await this.refreshAll();
       return id;
@@ -22,7 +22,7 @@ export const useWaypoints = defineStore('waypoints', {
     },
     async addToTrail(
       trailId: number,
-      input: { name: string; lat: number; lon: number; elev_m?: number | null; position?: number }
+      input: { name: string; latLng: LatLng; elev_m?: number | null; position?: number }
     ) {
       const { waypointId } = await this.$repos.waypoints.addToTrail({ trailId, ...input });
       await this.loadForTrail(trailId);
@@ -45,13 +45,7 @@ export const useWaypoints = defineStore('waypoints', {
     },
     async update(
       id: number,
-      patch: {
-        name?: string;
-        lat?: number;
-        lon?: number;
-        elev_m?: number | null;
-        description?: string | null;
-      }
+      patch: { name?: string; latLng?: LatLng; elev_m?: number | null; description?: string | null }
     ) {
       await this.$repos.waypoints.update(id, patch);
     },

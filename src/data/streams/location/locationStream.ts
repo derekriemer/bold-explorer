@@ -187,8 +187,7 @@ class LocationStream
     /** Start watching; providers emit raw samples, we apply gates. */
     async start ()
     {
-        if (this.isWatching() || this.starting)
-        {
+        if (this.isWatching() || this.starting){
             this.shouldBeWatching = true;
             return;
         }

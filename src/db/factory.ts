@@ -14,6 +14,7 @@ export async function createAppDb() {
   // On web, ensure the web store is initialized. The <jeep-sqlite>
   // element is created and configured in main.ts with wasmPath '/sqljs'.
   if (Capacitor.getPlatform() === 'web') {
+    console.log('[initAppDb] Web platform detected, initializing jeep-sqlite ');
     try {
       await CapacitorSQLite.initWebStore();
     } catch (e) {

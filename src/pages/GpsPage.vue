@@ -82,52 +82,23 @@
       :message=" permissionAlert.message " :buttons=" permissionAlertButtons "
       @didDismiss=" permissionAlert.dismiss " />
 
-    <ion-modal :is-open=" alignmentActive " @didDismiss=" closeAlignment ">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Align to Bearing</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click=" closeAlignment ">Done</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content>
-        <div class="alignment-modal">
-          <div class="alignment-hero">
-            <div class="alignment-target">{{ alignmentBearingText }}</div>
-            <div v-if="alignmentStatusText" class="alignment-status">{{ alignmentStatusText }}</div>
-          </div>
-
-          <ion-item class="alignment-input">
-            <ion-label position="stacked">Target bearing (degrees)</ion-label>
-            <ion-input ref="alignmentInputRef" type="number" inputmode="numeric" min="0" max="359"
-              :value=" alignmentBearingField " @ionInput=" onAlignmentInput " @ionChange=" commitAlignmentField "
-              @ionBlur=" () => commitAlignmentField() " />
-          </ion-item>
-
-          <div class="alignment-controls">
-            <ion-button fill="outline" size="large" @mousedown.prevent="startAdjust(-1)" @mouseup=" stopAdjust "
-              @mouseleave=" stopAdjust " @touchstart.prevent="startAdjust(-1)" @touchend=" stopAdjust "
-              @touchcancel=" stopAdjust ">
-              −1°
-            </ion-button>
-            <ion-button fill="outline" size="large" @mousedown.prevent="startAdjust(1)" @mouseup=" stopAdjust "
-              @mouseleave=" stopAdjust " @touchstart.prevent="startAdjust(1)" @touchend=" stopAdjust "
-              @touchcancel=" stopAdjust ">
-              +1°
-            </ion-button>
-          </div>
-
-          <ion-button expand="block" color="primary" :disabled=" targetBearingDeg == null "
-            @click=" setAlignmentToWaypointBearing ">
-            Match bearing to waypoint
-          </ion-button>
-          <ion-button expand="block" fill="clear" :disabled=" !compass.headingDeg " @click=" resetAlignmentToCurrent ">
-            Reset to current heading
-          </ion-button>
-        </div>
-      </ion-content>
-    </ion-modal>
+    <AlignmentModal
+      ref="alignmentModalRef"
+      :is-open="alignmentActive"
+      :bearing-text="alignmentBearingText"
+      :status-text="alignmentStatusText"
+      :bearing-field="alignmentBearingField"
+      :disable-match-waypoint="targetBearingDeg == null"
+      :disable-reset-current="!compass.headingDeg"
+      @close="closeAlignment"
+      @didDismiss="closeAlignment"
+      @ionInput="onAlignmentInput"
+      @commit="commitAlignmentField"
+      @startAdjust="startAdjust"
+      @stopAdjust="stopAdjust"
+      @matchWaypoint="setAlignmentToWaypointBearing"
+      @resetCurrent="resetAlignmentToCurrent"
+    />
   </ion-page>
 </template>
 
@@ -147,10 +118,6 @@ import
   IonButton,
   IonFab,
   IonFabButton,
-  IonModal,
-  IonButtons,
-  IonItem,
-  IonInput,
   IonAlert,
 } from '@ionic/vue';
 import { computed, onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue';
@@ -175,6 +142,7 @@ import { ensureLocationGranted } from '@/composables/usePermissions';
 import PositionReadout from '@/components/PositionReadout.vue';
 import PageHeaderToolbar from '@/components/PageHeaderToolbar.vue';
 import GpsScopePanel from '@/components/gps/GpsScopePanel.vue';
+import AlignmentModal from '@/components/modals/AlignmentModal.vue';
 import { toLatLng } from '@/types';
 import { locationStream } from '@/data/streams/location';
 
@@ -210,7 +178,6 @@ async function ensureLocationPermission (): Promise<boolean>
   });
 }
 
-type AlignmentInputElement = HTMLElement & { setFocus?: () => Promise<void> };
 type AlignmentInputEvent = CustomEvent<{ value?: string | null }>;
 
 const { scope, selectedWaypointId, selectedTrailId, selectedCollectionId, alignmentActive, alignmentBearingDeg, alignmentLastBearingDeg } =
@@ -302,7 +269,7 @@ const compass = useCompass({ throttleMs: 1000, initialMode: prefs.compassMode, a
 const compassModeLabel = compass.modeLabel;
 const compassHeadingText = compass.headingText;
 const alignmentAnnouncement = ref('');
-const alignmentInputRef = ref<AlignmentInputElement | null>(null);
+const alignmentModalRef = ref<{ focusInput: () => void } | null>(null);
 const alignmentBearingField = ref('');
 const adjustTimeout = ref<number | null>(null);
 const adjustInterval = ref<number | null>(null);
@@ -388,7 +355,7 @@ function openAlignment ()
   gpsUi.beginAlignment(seed);
   updateFieldFromStore(alignmentBearingDeg.value);
   alignmentAnnouncement.value = `Alignment guidance on. Target ${ formatBearing((alignmentBearingDeg.value ?? seed) ?? 0) }.`;
-  void nextTick(() => { alignmentInputRef.value?.setFocus?.(); });
+  void nextTick(() => { alignmentModalRef.value?.focusInput?.(); });
 }
 
 /** Close the modal and tear down timers/subscriptions. */
@@ -494,7 +461,7 @@ watch(alignmentActive, (active) =>
   if (active)
   {
     updateFieldFromStore(alignmentBearingDeg.value ?? alignmentLastBearingDeg.value);
-    void nextTick(() => { alignmentInputRef.value?.setFocus?.(); });
+    void nextTick(() => { alignmentModalRef.value?.focusInput?.(); });
   } else
   {
     alignmentBearingField.value = '';
@@ -595,13 +562,16 @@ async function markWaypoint ()
 
 onMounted(async () =>
 {
+  console.log("[gpsPage] onMounted");
   await Promise.all([trails.refresh(), waypointsStore.refreshAll(), collections.refresh()]);
   try
   {
     const ok = await ensureLocationPermission();
     if (ok)
     {
+      console.log("[gps page] It's okay to start location");
       await loc.start();
+      console.log("[gps page]: Recenter call occuring");
       await recenter();
     }
   } catch (e)
@@ -717,34 +687,4 @@ watch(() => gps.value, async (pos) =>
   color: var(--ion-color-medium);
 }
 
-.alignment-modal {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-}
-
-.alignment-hero {
-  text-align: center;
-}
-
-.alignment-target {
-  font-size: 2.5rem;
-  font-weight: 700;
-}
-
-.alignment-status {
-  margin-top: 4px;
-  color: var(--ion-color-medium);
-  font-size: 0.95rem;
-}
-
-.alignment-controls {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.alignment-input {
-  --inner-padding-end: 0;
-}
 </style>

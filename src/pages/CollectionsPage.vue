@@ -76,15 +76,12 @@
         </ion-card>
       </div>
 
-      <ion-alert :is-open="addOpen" header="New Collection"
-        :inputs="[
-          { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
-          { name: 'description', type: 'text', placeholder: 'Description (optional)', attributes: { 'aria-label': 'Description' } }
-        ]"
-        :buttons="[
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'Create', role: 'confirm', handler: (data: any) => handleAdd(data) }
-        ]" @didDismiss="addOpen = false" />
+      <ion-alert v-if=" collectionAlertView " :is-open=" collectionAlertOpen " :header=" collectionAlertView.header "
+        :message=" collectionAlertView.message " :sub-header=" collectionAlertView.subHeader "
+        :inputs=" collectionAlertView.inputs " :buttons=" collectionAlertView.buttons "
+        :css-class=" collectionAlertView.cssClass " :backdrop-dismiss=" collectionAlertView.backdropDismiss "
+        :translucent=" collectionAlertView.translucent " :animated=" collectionAlertView.animated " :id=" collectionAlertView.id "
+        @didDismiss=" collectionAlerts.onDidDismiss " />
 
       <MultiSelectWizard v-if="wizardConfig" :open="wizardOpen" :config="wizardConfig"
         @update:open="(v: boolean) => wizardOpen = v"
@@ -107,8 +104,9 @@ import { exportCollectionToGpx } from '@/data/storage/gpx/gpx.service';
 import { useActions } from '@/composables/useActions';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { useTrails } from '@/stores/useTrails';
-import MultiSelectWizard from '@/components/MultiSelectWizard.vue';
+import MultiSelectWizard from '@/components/modals/MultiSelectWizard.vue';
 import type { MultiSelectConfig, MultiSelectItem } from '@/types/multi-select';
+import { useAlertController } from '@/composables/useAlertController';
 
 const collections = useCollections();
 const actions = useActions();
@@ -116,14 +114,25 @@ const wps = useWaypoints();
 const trails = useTrails();
 
 const openId = ref<number | null>(null);
-const addOpen = ref(false);
 const toastOpen = ref(false);
 const toastMessage = ref('');
 const wizardOpen = ref(false);
 const wizardConfig = ref<MultiSelectConfig | null>(null);
 const wizardCollectionId = ref<number | null>(null);
 
-function onAdd() { addOpen.value = true; }
+const collectionAlerts = useAlertController<'addCollection'>();
+const collectionAlertView = collectionAlerts.current;
+const collectionAlertOpen = collectionAlerts.isOpen;
+
+function buildAddCollectionInputs ()
+{
+  return [
+    { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
+    { name: 'description', type: 'text', placeholder: 'Description (optional)', attributes: { 'aria-label': 'Description' } }
+  ];
+}
+
+function onAdd() { void collectionAlerts.open('addCollection'); }
 
 function handleAdd(data: any): boolean {
   const name = String(data?.name ?? '').trim();
@@ -137,6 +146,19 @@ function handleAdd(data: any): boolean {
   })();
   return true;
 }
+
+collectionAlerts.register('addCollection', () => ({
+  header: 'New Collection',
+  inputs: buildAddCollectionInputs(),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Create',
+      role: 'confirm',
+      handler: ({ data }) => handleAdd(data)
+    }
+  ]
+}));
 
 async function onExport(id: number) {
   try {

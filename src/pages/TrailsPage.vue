@@ -68,41 +68,12 @@
         </ion-card>
       </div>
 
-      <!-- Add Trail -->
-      <ion-alert :is-open="addOpen" header="New Trail"
-        :inputs="[
-          { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
-          { name: 'description', type: 'text', placeholder: 'Description (optional)', attributes: { 'aria-label': 'Description' } }
-        ]"
-        :buttons="[
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'Create', role: 'confirm', handler: (data: any) => handleAddTrail(data) }
-        ]" @didDismiss="addOpen = false" />
-
-      <!-- Rename Trail -->
-      <ion-alert :is-open="renameOpen" header="Rename Trail"
-        :inputs="[
-          { name: 'name', type: 'text', value: renameDraft, attributes: { 'aria-label': 'Name' } }
-        ]"
-        :buttons="[
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'Save', role: 'confirm', handler: (data: any) => doRenameTrail(data?.name) }
-        ]" @didDismiss="renameOpen = false" />
-
-      <!-- Delete Trail -->
-      <ion-alert :is-open="deleteOpen" header="Delete Trail?" message="This cannot be undone."
-        :buttons="[
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'Delete', role: 'destructive', handler: () => doDeleteTrail() }
-        ]" @didDismiss="deleteOpen = false" />
-
-      <!-- Add Waypoint to Trail -->
-      <ion-alert :is-open="addWpOpen" header="Add Waypoint"
-        :inputs="addWpInputs"
-        :buttons="[
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'Add', role: 'confirm', handler: (data: any) => handleAddWaypoint(data) }
-        ]" @didDismiss="addWpOpen = false" />
+      <ion-alert v-if=" trailAlertView " :is-open=" trailAlertOpen " :header=" trailAlertView.header "
+        :message=" trailAlertView.message " :sub-header=" trailAlertView.subHeader " :inputs=" trailAlertView.inputs "
+        :buttons=" trailAlertView.buttons " :css-class=" trailAlertView.cssClass "
+        :backdrop-dismiss=" trailAlertView.backdropDismiss " :translucent=" trailAlertView.translucent "
+        :animated=" trailAlertView.animated " :id=" trailAlertView.id "
+        @didDismiss=" trailAlerts.onDidDismiss " />
 
       <MultiSelectWizard v-if="wizardConfig" :open="wizardOpen" :config="wizardConfig"
         @update:open="(v: boolean) => wizardOpen = v"
@@ -125,29 +96,59 @@ import { useActions } from '@/composables/useActions';
 import { useTrails } from '@/stores/useTrails';
 import { useWaypoints } from '@/stores/useWaypoints';
 import { exportTrailToGpx } from '@/data/storage/gpx/gpx.service';
-import MultiSelectWizard from '@/components/MultiSelectWizard.vue';
+import MultiSelectWizard from '@/components/modals/MultiSelectWizard.vue';
 import type { MultiSelectConfig, MultiSelectItem } from '@/types/multi-select';
+import { useAlertController } from '@/composables/useAlertController';
 
 const trails = useTrails();
 const wps = useWaypoints();
 const actions = useActions();
 
 const openId = ref<number | null>(null);
-const addOpen = ref(false);
-const renameOpen = ref(false);
-const deleteOpen = ref(false);
-const renameId = ref<number | null>(null);
-const renameDraft = ref('');
-const deleteId = ref<number | null>(null);
+const trailAlerts = useAlertController<'addTrail' | 'renameTrail' | 'deleteTrail' | 'addWaypoint'>();
+const trailAlertView = trailAlerts.current;
+const trailAlertOpen = trailAlerts.isOpen;
 
-const addWpOpen = ref(false);
-const addWpTrailId = ref<number | null>(null);
-const addWpInputs = [
-  { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
-  { name: 'lat', type: 'number', placeholder: 'Latitude', attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
-  { name: 'lon', type: 'number', placeholder: 'Longitude', attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
-  { name: 'elev_m', type: 'number', placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
-];
+interface RenameTrailPayload
+{
+  id: number;
+  currentName: string;
+}
+
+interface DeleteTrailPayload
+{
+  id: number;
+}
+
+interface AddWaypointPayload
+{
+  trailId: number;
+}
+
+function buildAddTrailInputs ()
+{
+  return [
+    { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
+    { name: 'description', type: 'text', placeholder: 'Description (optional)', attributes: { 'aria-label': 'Description' } }
+  ];
+}
+
+function buildRenameInputs (payload?: RenameTrailPayload)
+{
+  return [
+    { name: 'name', type: 'text', value: payload?.currentName ?? '', attributes: { 'aria-label': 'Name' } }
+  ];
+}
+
+function buildAddWaypointInputs ()
+{
+  return [
+    { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
+    { name: 'lat', type: 'number', placeholder: 'Latitude', attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
+    { name: 'lon', type: 'number', placeholder: 'Longitude', attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
+    { name: 'elev_m', type: 'number', placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
+  ];
+}
 
 const wizardOpen = ref(false);
 const wizardConfig = ref<MultiSelectConfig | null>(null);
@@ -156,7 +157,7 @@ const wizardTrailId = ref<number | null>(null);
 const toastOpen = ref(false);
 const toastMessage = ref('');
 
-function onAdd() { addOpen.value = true; }
+function onAdd() { void trailAlerts.open('addTrail'); }
 
 function handleAddTrail(data: any): boolean {
   const name = String(data?.name ?? '').trim();
@@ -172,36 +173,41 @@ function handleAddTrail(data: any): boolean {
 }
 
 function onRename(id: number, currentName: string) {
-  renameId.value = id;
-  renameDraft.value = currentName;
-  renameOpen.value = true;
+  const payload: RenameTrailPayload = { id, currentName };
+  void trailAlerts.open('renameTrail', payload);
 }
 
-async function doRenameTrail(name: string) {
-  if (!renameId.value) return;
-  const v = String(name ?? '').trim();
-  if (!v) return;
-  const id = renameId.value;
-  const old = (trails.list.find(t => Number(t.id) === id)?.name) || '';
-  await trails.rename(id, v);
-  actions.show(`Renamed "${old}" → "${v}"`, {
-    kind: 'success',
-    canUndo: true,
-    onUndo: async () => { await trails.rename(id, old); }
-  });
+function handleRenameTrail(data: any, payload?: RenameTrailPayload): boolean {
+  if (!payload) return true;
+  const v = String(data?.name ?? '').trim();
+  if (!v) { showToast('Enter a name'); return false; }
+  (async () => {
+    const id = payload.id;
+    const old = (trails.list.find(t => Number(t.id) === id)?.name) || '';
+    await trails.rename(id, v);
+    actions.show(`Renamed "${old}" → "${v}"`, {
+      kind: 'success',
+      canUndo: true,
+      onUndo: async () => { await trails.rename(id, old); }
+    });
+  })();
+  return true;
 }
 
 function onDelete(id: number) {
-  deleteId.value = id;
-  deleteOpen.value = true;
+  const payload: DeleteTrailPayload = { id };
+  void trailAlerts.open('deleteTrail', payload);
 }
 
-async function doDeleteTrail() {
-  if (!deleteId.value) return;
-  const id = deleteId.value;
-  await trails.remove(id);
-  if (openId.value === id) openId.value = null;
-  actions.show('Trail deleted', { kind: 'success' });
+function handleDeleteTrail(payload?: DeleteTrailPayload): boolean {
+  if (!payload) return true;
+  (async () => {
+    const id = payload.id;
+    await trails.remove(id);
+    if (openId.value === id) openId.value = null;
+    actions.show('Trail deleted', { kind: 'success' });
+  })();
+  return true;
 }
 
 async function toggleOpen(id: number) {
@@ -220,15 +226,15 @@ async function onExport(trailId: number) {
 }
 
 function openAddWaypoint(trailId: number) {
-  addWpTrailId.value = trailId;
-  addWpOpen.value = true;
+  const payload: AddWaypointPayload = { trailId };
+  void trailAlerts.open('addWaypoint', payload);
 }
 
 function isValidLat(lat: number): boolean { return Number.isFinite(lat) && lat >= -90 && lat <= 90; }
 function isValidLon(lon: number): boolean { return Number.isFinite(lon) && lon >= -180 && lon <= 180; }
 
-function handleAddWaypoint(data: any): boolean {
-  if (!addWpTrailId.value) return true;
+function handleAddWaypoint(data: any, payload?: AddWaypointPayload): boolean {
+  if (!payload) return true;
   const name = String(data?.name ?? '').trim();
   const lat = Number(data?.lat);
   const lon = Number(data?.lon);
@@ -238,12 +244,64 @@ function handleAddWaypoint(data: any): boolean {
     return false;
   }
   (async () => {
-    await wps.addToTrail(addWpTrailId.value!, { name, lat, lon, elev_m: elev ?? undefined });
-    await wps.loadForTrail(addWpTrailId.value!);
+    await wps.addToTrail(payload.trailId, { name, lat, lon, elev_m: elev ?? undefined });
+    await wps.loadForTrail(payload.trailId);
     actions.show('Waypoint added', { kind: 'success' });
   })();
   return true;
 }
+
+trailAlerts.register('addTrail', () => ({
+  header: 'New Trail',
+  inputs: buildAddTrailInputs(),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Create',
+      role: 'confirm',
+      handler: ({ data }) => handleAddTrail(data)
+    }
+  ]
+}));
+
+trailAlerts.register('renameTrail', (payload?: RenameTrailPayload) => ({
+  header: 'Rename Trail',
+  inputs: buildRenameInputs(payload),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Save',
+      role: 'confirm',
+      handler: ({ data }) => handleRenameTrail(data, payload)
+    }
+  ]
+}));
+
+trailAlerts.register('deleteTrail', (payload?: DeleteTrailPayload) => ({
+  header: 'Delete Trail?',
+  message: 'This cannot be undone.',
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Delete',
+      role: 'destructive',
+      handler: () => handleDeleteTrail(payload)
+    }
+  ]
+}));
+
+trailAlerts.register('addWaypoint', (payload?: AddWaypointPayload) => ({
+  header: 'Add Waypoint',
+  inputs: buildAddWaypointInputs(),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Add',
+      role: 'confirm',
+      handler: ({ data }) => handleAddWaypoint(data, payload)
+    }
+  ]
+}));
 
 function makeAttachConfig(trailId: number): MultiSelectConfig {
   return {

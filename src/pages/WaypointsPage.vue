@@ -23,7 +23,7 @@
     <ion-content>
       <ion-list>
         <div v-for="wp in filtered" :key=" wp.id ">
-              <ion-item button :detail=" true " @click=" toggleExpand(wp.id )"
+          <ion-item button :detail=" true " @click=" toggleExpand(wp.id)"
             :aria-expanded=" expandedId === wp.id ? 'true' : 'false' ">
             <ion-label>
               <h2>{{ wp.name }}</h2>
@@ -39,10 +39,10 @@
             <div class="row" v-if="wp.elev_m != null"><span class="k">Elevation:</span> <span class="v">{{ wp.elev_m }}
                 m</span></div>
             <div class="row" v-if="wp.description"><span class="k">Description:</span> <span class="v">{{ wp.description
-                }}</span></div>
+            }}</span></div>
             <div class="actions">
               <ion-button size="small" fill="outline" @click=" onAttach(wp.id)">Attach</ion-button>
-              <ion-button size="small" fill="outline" @click=" onEdit(wp.id, wp.name)">Edit</ion-button>
+              <ion-button size="small" fill="outline" @click=" onEdit(wp.id)">Edit</ion-button>
               <ion-button size="small" color="danger" fill="clear" @click=" onDelete(wp.id)">Delete</ion-button>
             </div>
           </div>
@@ -51,30 +51,12 @@
 
       <ion-toast :is-open=" toastOpen " :message=" toastMessage " :duration=" 1800 " @didDismiss="toastOpen = false" />
 
-      <ion-alert :is-open=" editOpen " header="Edit Waypoint" :inputs=" [
-        { name: 'name', type: 'text', value: editName, attributes: { 'aria-label': 'Name' } },
-        { name: 'lat', type: 'number', value: editLat, attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
-        { name: 'lon', type: 'number', value: editLon, attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
-        { name: 'elev_m', type: 'number', value: editElev, placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
-      ] " :buttons=" [
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'Save', role: 'confirm', handler: (data: any) => { doEdit(data); } }
-        ] " @didDismiss="editOpen = false" />
-
-      <ion-alert :is-open=" deleteOpen " header="Delete Waypoint?" message="This cannot be undone." :buttons=" [
-        { text: 'Cancel', role: 'cancel' },
-        { text: 'Delete', role: 'destructive', handler: () => doDelete() }
-      ] " @didDismiss="deleteOpen = false" />
-
-      <ion-alert :is-open=" addOpen " header="Add Waypoint" :inputs=" addInputs " :buttons=" [
-        { text: 'Cancel', role: 'cancel' },
-        { text: 'Add', role: 'confirm', handler: (data: any) => handleAddConfirm(data) }
-      ] " @didDismiss="addOpen = false" />
-
-      <ion-alert :is-open=" attachOpen " header="Attach to Trail" :inputs=" trailInputs " :buttons=" [
-        { text: 'Cancel', role: 'cancel' },
-        { text: 'Attach', role: 'confirm', handler: (data: any) => doAttach(Number(data?.trailId)) }
-      ] " @didDismiss="attachOpen = false" />
+      <ion-alert v-if=" waypointAlertView " :is-open=" waypointAlertOpen " :header=" waypointAlertView.header "
+        :message=" waypointAlertView.message " :sub-header=" waypointAlertView.subHeader "
+        :inputs=" waypointAlertView.inputs " :buttons=" waypointAlertView.buttons "
+        :css-class=" waypointAlertView.cssClass " :backdrop-dismiss=" waypointAlertView.backdropDismiss "
+        :translucent=" waypointAlertView.translucent " :animated=" waypointAlertView.animated " :id=" waypointAlertView.id "
+        @didDismiss=" waypointAlerts.onDidDismiss " />
     </ion-content>
   </ion-page>
 </template>
@@ -102,6 +84,7 @@ import type { Waypoint } from '@/db/schema';
 import { actionsService } from '@/services/actions.service';
 import { toLatLng, tryParseLatLng, type LatLng } from '@/types';
 import { locationStream } from '@/data/streams/location';
+import { useAlertController } from '@/composables/useAlertController';
 
 const wps = useWaypoints();
 const trails = useTrails();
@@ -112,7 +95,7 @@ const actions = useActions();
 const query = ref('');
 const prefs = usePrefsStore();
 const units = computed(() => prefs.units);
-const liveUpdates = ref(false);
+const liveUpdates = ref(true);
 const expandedId = ref<number | null>(null);
 
 const formatDistance = (d: number, u: 'metric' | 'imperial') => fmtDistance(d, u);
@@ -171,15 +154,73 @@ function showTodo (msg = 'Will implement later')
   toastOpen.value = true;
 }
 
-// Add waypoint
-const addOpen = ref(false);
-const addInputs = [
-  { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
-  { name: 'lat', type: 'number', placeholder: 'Latitude', attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
-  { name: 'lon', type: 'number', placeholder: 'Longitude', attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
-  { name: 'elev_m', type: 'number', placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
-];
-function onAdd () { addOpen.value = true; }
+const waypointAlerts = useAlertController<'add' | 'edit' | 'delete' | 'attach'>();
+const waypointAlertView = waypointAlerts.current;
+const waypointAlertOpen = waypointAlerts.isOpen;
+
+interface EditAlertPayload
+{
+  id: number;
+  prevSnapshot: Selectable<Waypoint> | null;
+  defaults: {
+    name: string;
+    lat: number;
+    lon: number;
+    elev_m: number | null;
+  };
+}
+
+interface DeleteAlertPayload
+{
+  id: number;
+  snapshot: Selectable<Waypoint> | null;
+}
+
+interface AttachAlertPayload
+{
+  id: number;
+}
+
+function buildAddInputs ()
+{
+  return [
+    { name: 'name', type: 'text', placeholder: 'Name', attributes: { 'aria-label': 'Name' } },
+    { name: 'lat', type: 'number', placeholder: 'Latitude', attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' } },
+    { name: 'lon', type: 'number', placeholder: 'Longitude', attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' } },
+    { name: 'elev_m', type: 'number', placeholder: 'Elevation (m, optional)', attributes: { step: 'any', 'aria-label': 'Elevation in meters' } }
+  ];
+}
+
+function buildEditInputs (payload?: EditAlertPayload)
+{
+  return [
+    { name: 'name', type: 'text', value: payload?.defaults.name ?? '', attributes: { 'aria-label': 'Name' } },
+    {
+      name: 'lat',
+      type: 'number',
+      value: payload?.defaults.lat ?? '',
+      attributes: { step: 'any', min: '-90', max: '90', 'aria-label': 'Latitude' }
+    },
+    {
+      name: 'lon',
+      type: 'number',
+      value: payload?.defaults.lon ?? '',
+      attributes: { step: 'any', min: '-180', max: '180', 'aria-label': 'Longitude' }
+    },
+    {
+      name: 'elev_m',
+      type: 'number',
+      value: payload?.defaults.elev_m ?? '',
+      placeholder: 'Elevation (m, optional)',
+      attributes: { step: 'any', 'aria-label': 'Elevation in meters' }
+    }
+  ];
+}
+
+function onAdd ()
+{
+  void waypointAlerts.open('add');
+}
 function isValidLat (lat: number): boolean { return Number.isFinite(lat) && lat >= -90 && lat <= 90; }
 function isValidLon (lon: number): boolean { return Number.isFinite(lon) && lon >= -180 && lon <= 180; }
 function handleAddConfirm (data: any): boolean
@@ -209,99 +250,175 @@ function handleAddConfirm (data: any): boolean
 }
 
 // Edit (name, lat, lon, elevation)
-const editOpen = ref(false);
-const editId = ref<number | null>(null);
-const editName = ref('');
-const editLat = ref<number | null>(null);
-const editLon = ref<number | null>(null);
-const editElev = ref<number | null>(null);
-const prevSnapshot = ref<Selectable<Waypoint> | null>(null);
-function onEdit (id: number, currentName: string)
+function onEdit (id: number)
 {
   const wp = (wps.all as Selectable<Waypoint>[]).find(w => w.id === id) ?? null;
   if (!wp) return;
-  editId.value = id;
-  editName.value = currentName;
-  editLat.value = wp.lat;
-  editLon.value = wp.lon;
-  editElev.value = wp.elev_m ?? null;
-  prevSnapshot.value = { ...wp };
-  editOpen.value = true;
+  const payload: EditAlertPayload = {
+    id,
+    prevSnapshot: { ...wp },
+    defaults: {
+      name: wp.name,
+      lat: wp.lat,
+      lon: wp.lon,
+      elev_m: wp.elev_m ?? null
+    }
+  };
+  void waypointAlerts.open('edit', payload);
 }
-async function doEdit (data: any)
+
+function handleEditConfirm (data: any, payload?: EditAlertPayload): boolean
 {
-  if (!editId.value) return;
-  const name = String((data?.name ?? editName.value) ?? '').trim();
-  const lat = Number(data?.lat ?? editLat.value);
-  const lon = Number(data?.lon ?? editLon.value);
+  if (!payload) return true;
+  const name = String((data?.name ?? payload.defaults.name) ?? '').trim();
+  const lat = Number(data?.lat ?? payload.defaults.lat);
+  const lon = Number(data?.lon ?? payload.defaults.lon);
   const elev = data?.elev_m != null && data.elev_m !== '' ? Number(data.elev_m) : null;
   if (!name || !isValidLat(lat) || !isValidLon(lon))
   {
     actions.show('Enter a valid name, lat (-90..90), and lon (-180..180)', { kind: 'error', placement: 'banner-top' });
-    return;
+    return false;
   }
-  const id = editId.value;
-  const prev = prevSnapshot.value;
-  await wps.update(id, { name, lat, lon, elev_m: elev });
-  await wps.refreshAll();
-  // If showing nearby distances, recompute to keep overlay in sync
-  if (liveUpdates.value || Object.keys(distances.value).length > 0) { await refreshDistances(); }
-  actionsService.show('Waypoint updated', {
-    kind: 'success',
-    canUndo: !!prev,
-    onUndo: prev ? async () =>
+  (async () =>
+  {
+    const id = payload.id;
+    const prev = payload.prevSnapshot ? { ...payload.prevSnapshot } : null;
+    await wps.update(id, { name, lat, lon, elev_m: elev });
+    await wps.refreshAll();
+    if (liveUpdates.value || Object.keys(distances.value).length > 0)
     {
-      await wps.update(id, { name: prev.name, lat: prev.lat, lon: prev.lon, elev_m: prev.elev_m ?? null });
-      await wps.refreshAll();
-    } : undefined
-  });
+      await refreshDistances();
+    }
+    actionsService.show('Waypoint updated', {
+      kind: 'success',
+      canUndo: !!prev,
+      onUndo: prev ? async () =>
+      {
+        await wps.update(id, { name: prev.name, lat: prev.lat, lon: prev.lon, elev_m: prev.elev_m ?? null });
+        await wps.refreshAll();
+      } : undefined
+    });
+  })();
+  return true;
 }
 
 // Delete
-const deleteOpen = ref(false);
-const deleteId = ref<number | null>(null);
-const deleteSnapshot = ref<Selectable<Waypoint> | null>(null);
 function onDelete (id: number)
 {
-  deleteId.value = id;
-  deleteSnapshot.value = (wps.all as Selectable<Waypoint>[]).find(w => w.id === id) ?? null;
-  deleteOpen.value = true;
+  const snapshot = (wps.all as Selectable<Waypoint>[]).find(w => w.id === id) ?? null;
+  const payload: DeleteAlertPayload = {
+    id,
+    snapshot: snapshot ? { ...snapshot } : null
+  };
+  void waypointAlerts.open('delete', payload);
 }
-async function doDelete ()
+
+function handleDeleteConfirm (payload?: DeleteAlertPayload): boolean
 {
-  if (!deleteId.value) return;
-  const snap = deleteSnapshot.value;
-  await wps.remove(deleteId.value);
-  await wps.refreshAll();
-  if (liveUpdates.value || Object.keys(distances.value).length > 0) { await refreshDistances(); }
-  actions.show('Waypoint deleted', {
-    kind: 'success',
-    canUndo: !!snap,
-    onUndo: snap ? async () =>
+  if (!payload) return true;
+  const snap = payload.snapshot ? { ...payload.snapshot } : null;
+  (async () =>
+  {
+    await wps.remove(payload.id);
+    await wps.refreshAll();
+    if (liveUpdates.value || Object.keys(distances.value).length > 0)
     {
-      await wps.create({ name: snap.name, lat: snap.lat, lon: snap.lon, elev_m: snap.elev_m ?? null });
-      await wps.refreshAll();
-    } : undefined
-  });
+      await refreshDistances();
+    }
+    actions.show('Waypoint deleted', {
+      kind: 'success',
+      canUndo: !!snap,
+      onUndo: snap ? async () =>
+      {
+        await wps.create({ name: snap.name, lat: snap.lat, lon: snap.lon, elev_m: snap.elev_m ?? null });
+        await wps.refreshAll();
+      } : undefined
+    });
+  })();
+  return true;
 }
 
 // Attach to trail
-const attachOpen = ref(false);
-const attachId = ref<number | null>(null);
 const trailInputs = computed(() => trails.list.map(t => ({
-  name: 'trailId', type: 'radio', label: t.name, value: String(t.id)
+  name: 'trailId',
+  type: 'radio',
+  label: t.name,
+  value: String(t.id)
 })));
+
 function onAttach (id: number)
 {
-  attachId.value = id;
-  attachOpen.value = true;
+  const payload: AttachAlertPayload = { id };
+  void waypointAlerts.open('attach', payload);
 }
-async function doAttach (trailId: number)
+
+function handleAttachConfirm (data: any, payload?: AttachAlertPayload): boolean
 {
-  if (!attachId.value || !Number.isFinite(trailId)) return;
-  await wps.attach(trailId, attachId.value);
-  showTodo('Attached to trail');
+  if (!payload) return true;
+  const trailId = Number(data?.trailId);
+  if (!Number.isFinite(trailId))
+  {
+    return false;
+  }
+  (async () =>
+  {
+    await wps.attach(trailId, payload.id);
+    showTodo('Attached to trail');
+  })();
+  return true;
 }
+
+waypointAlerts.register('add', () => ({
+  header: 'Add Waypoint',
+  inputs: buildAddInputs(),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Add',
+      role: 'confirm',
+      handler: ({ data }) => handleAddConfirm(data)
+    }
+  ]
+}));
+
+waypointAlerts.register('edit', (payload?: EditAlertPayload) => ({
+  header: 'Edit Waypoint',
+  inputs: buildEditInputs(payload),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Save',
+      role: 'confirm',
+      handler: ({ data }) => handleEditConfirm(data, payload)
+    }
+  ]
+}));
+
+waypointAlerts.register('delete', (payload?: DeleteAlertPayload) => ({
+  header: 'Delete Waypoint?',
+  message: 'This cannot be undone.',
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Delete',
+      role: 'destructive',
+      handler: () => handleDeleteConfirm(payload)
+    }
+  ]
+}));
+
+waypointAlerts.register('attach', (payload?: AttachAlertPayload) => ({
+  header: 'Attach to Trail',
+  inputs: trailInputs.value.map(input => ({ ...input })),
+  buttons: [
+    { text: 'Cancel', role: 'cancel' },
+    {
+      text: 'Attach',
+      role: 'confirm',
+      handler: ({ data }) => handleAttachConfirm(data, payload)
+    }
+  ]
+}));
 
 // Import/Export placeholders
 function onImport () { showTodo('Import GPX — will implement later'); }

@@ -200,7 +200,7 @@ class LocationDebugService {
     osc.frequency.setValueAtTime(frequency, now);
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.05, now + 0.02);
+    gain.gain.linearRampToValueAtTime(0.05, now + 0.2);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     osc.connect(gain);

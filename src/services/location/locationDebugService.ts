@@ -6,7 +6,7 @@ import type { LocationSample } from '@/types';
 const BASE_FREQ_HZ = 220;
 const MAX_STEPS = 36;
 const MAX_ACCURACY_METERS = 30;
-const DEFAULT_DURATION_SEC = 0.25;
+const DEFAULT_DURATION_SEC = 1;
 
 class LocationDebugService {
   private subscription: Subscription | null = null;
@@ -25,7 +25,7 @@ class LocationDebugService {
     }
 
     this.ensureAudio();
-    // this.ensureLiveRegion(); // Temporarily disabled per request; leave wiring for future toggle.
+    this.ensureLiveRegion(); // Temporarily disabled per request; leave wiring for future toggle.
 
     this.subscription = locationStream.updates.subscribe((sample) => {
       this.handleSample(sample);
@@ -200,7 +200,7 @@ class LocationDebugService {
     osc.frequency.setValueAtTime(frequency, now);
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.05, now + 0.2);
+    gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     osc.connect(gain);

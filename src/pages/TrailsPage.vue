@@ -381,7 +381,7 @@ function handleAddWaypoint(data: any, payload?: AddWaypointPayload): boolean {
     await wps.addToTrail(payload.trailId, {
       name,
       latLng: toLatLng(lat, lon),
-      elev_m: elev ?? undefined
+      elev_m: elev ?? undefined,
     });
     await wps.loadForTrail(payload.trailId);
     actions.show('Waypoint added', { kind: 'success' });
